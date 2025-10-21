@@ -1,0 +1,11 @@
+{
+    "mcpServers": {
+        "laravel-boost": {
+            "command": "/Users/rhys/.config/herd-lite/bin/php",
+            "args": [
+                "/Users/rhys/image-identifier/artisan",
+                "boost:mcp"
+            ]
+        }
+    }
+}
