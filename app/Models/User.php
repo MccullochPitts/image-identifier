@@ -4,15 +4,17 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Laravel\Sanctum\HasApiTokens;
 use Spark\Billable;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, TwoFactorAuthenticatable, Billable;
+    use Billable, HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable;
 
     /**
      * The attributes that are mass assignable.
@@ -59,7 +61,7 @@ class User extends Authenticatable
      */
     public function uploadLimit(): int
     {
-        if (!$this->subscribed()) {
+        if (! $this->subscribed()) {
             return 0;
         }
 
@@ -105,6 +107,14 @@ class User extends Authenticatable
     public function remainingUploads(): int
     {
         return max(0, $this->uploadLimit() - $this->uploads_count);
+    }
+
+    /**
+     * Get all images belonging to this user.
+     */
+    public function images(): HasMany
+    {
+        return $this->hasMany(Image::class);
     }
 
     // TODO: Implement webhook listener for subscription renewal
