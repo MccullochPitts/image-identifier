@@ -734,6 +734,45 @@ git branch -d feature/add-webhooks
 ```
 
 
+=== security rules ===
+
+## Sensitive Files & Git Security
+
+### Never Commit Sensitive Files
+The following files must NEVER be committed to git and are protected in `.gitignore`:
+
+**CRITICAL - Never commit:**
+- `.env` - Environment variables with secrets
+- `.env.backup` - Backup environment files
+- `.env.production` - Production environment variables
+- `auth.json` - Composer authentication credentials (contains GitHub tokens, private package credentials)
+
+**Why auth.json is critical:**
+- Contains GitHub personal access tokens
+- Contains credentials for private Composer repositories
+- If committed, tokens must be immediately revoked and regenerated
+- Already protected in `.gitignore` on line 23
+
+### Verifying Files Are Protected
+Before committing, always verify sensitive files are not staged:
+```bash
+git status
+git ls-files | grep -E "(\.env|auth\.json)"  # Should return nothing
+```
+
+### If Accidentally Committed
+If you accidentally commit sensitive files:
+1. **DO NOT PUSH** - Stop immediately
+2. Amend the commit: `git commit --amend`
+3. Remove the file from staging: `git reset HEAD <file>`
+4. Verify it's in `.gitignore`
+
+If already pushed to remote:
+1. Revoke all credentials immediately (GitHub tokens, API keys, etc.)
+2. Contact the user to discuss repository history rewrite
+3. Never force-push to `main` or `develop` without approval
+
+
 === ci/cd rules ===
 
 ## Continuous Integration & Quality Checks
