@@ -41,7 +41,7 @@ class SparkServiceProvider extends ServiceProvider
                         'You have used %s uploads this billing period. Cannot switch to a plan with a %s upload limit. Please wait until your next billing cycle or contact support.',
                         number_format($billable->uploads_count),
                         number_format($targetLimit)
-                    )
+                    ),
                 ]);
             }
         });

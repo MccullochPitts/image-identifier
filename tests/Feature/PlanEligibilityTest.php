@@ -13,18 +13,21 @@ beforeEach(function () {
 });
 
 // Helper function to get Plan object by price ID
-function getPlanByPriceId($priceId) {
+function getPlanByPriceId($priceId)
+{
     $plans = Spark::plans('user');
     foreach ($plans as $plan) {
         if ($plan->id === $priceId) {
             return $plan;
         }
     }
+
     return null;
 }
 
 // Helper function to attempt plan swap with eligibility check
-function attemptPlanSwap($user, $newPriceId) {
+function attemptPlanSwap($user, $newPriceId)
+{
     $plan = getPlanByPriceId($newPriceId);
 
     // This mimics what Spark's UpdateSubscriptionController does
@@ -172,7 +175,7 @@ test('user cannot downgrade from enterprise to standard when usage exceeds stand
 
     $user->newSubscription('default', env('SPARK_ENTERPRISE_MONTHLY_PLAN'))->create('pm_card_visa');
 
-    expect(fn() => attemptPlanSwap($user, env('SPARK_STANDARD_MONTHLY_PLAN')))
+    expect(fn () => attemptPlanSwap($user, env('SPARK_STANDARD_MONTHLY_PLAN')))
         ->toThrow(ValidationException::class);
 
     // Verify user is still on Enterprise plan
@@ -184,7 +187,7 @@ test('user cannot downgrade from enterprise to startup when usage exceeds startu
 
     $user->newSubscription('default', env('SPARK_ENTERPRISE_MONTHLY_PLAN'))->create('pm_card_visa');
 
-    expect(fn() => attemptPlanSwap($user, env('SPARK_STARTUP_MONTHLY_PLAN')))
+    expect(fn () => attemptPlanSwap($user, env('SPARK_STARTUP_MONTHLY_PLAN')))
         ->toThrow(ValidationException::class);
 
     expect($user->fresh()->uploadLimit())->toBe(1000000);
@@ -195,7 +198,7 @@ test('user cannot downgrade from startup to standard when usage exceeds standard
 
     $user->newSubscription('default', env('SPARK_STARTUP_MONTHLY_PLAN'))->create('pm_card_visa');
 
-    expect(fn() => attemptPlanSwap($user, env('SPARK_STANDARD_MONTHLY_PLAN')))
+    expect(fn () => attemptPlanSwap($user, env('SPARK_STANDARD_MONTHLY_PLAN')))
         ->toThrow(ValidationException::class);
 
     expect($user->fresh()->uploadLimit())->toBe(100000);
@@ -226,7 +229,7 @@ test('user cannot downgrade when usage exactly equals target limit', function ()
 
     $user->newSubscription('default', env('SPARK_STARTUP_MONTHLY_PLAN'))->create('pm_card_visa');
 
-    expect(fn() => attemptPlanSwap($user, env('SPARK_STANDARD_MONTHLY_PLAN')))
+    expect(fn () => attemptPlanSwap($user, env('SPARK_STANDARD_MONTHLY_PLAN')))
         ->toThrow(ValidationException::class);
 });
 
@@ -282,7 +285,7 @@ test('user cannot downgrade from annual enterprise to monthly standard when over
 
     $user->newSubscription('default', env('SPARK_ENTERPRISE_YEARLY_PLAN'))->create('pm_card_visa');
 
-    expect(fn() => attemptPlanSwap($user, env('SPARK_STANDARD_MONTHLY_PLAN')))
+    expect(fn () => attemptPlanSwap($user, env('SPARK_STANDARD_MONTHLY_PLAN')))
         ->toThrow(ValidationException::class);
 });
 
@@ -324,10 +327,10 @@ test('user with maximum enterprise usage cannot downgrade to any lower tier', fu
 
     $user->newSubscription('default', env('SPARK_ENTERPRISE_MONTHLY_PLAN'))->create('pm_card_visa');
 
-    expect(fn() => attemptPlanSwap($user, env('SPARK_STARTUP_MONTHLY_PLAN')))
+    expect(fn () => attemptPlanSwap($user, env('SPARK_STARTUP_MONTHLY_PLAN')))
         ->toThrow(ValidationException::class);
 
-    expect(fn() => attemptPlanSwap($user, env('SPARK_STANDARD_MONTHLY_PLAN')))
+    expect(fn () => attemptPlanSwap($user, env('SPARK_STANDARD_MONTHLY_PLAN')))
         ->toThrow(ValidationException::class);
 });
 
@@ -337,7 +340,7 @@ test('user with maximum startup usage can only upgrade to enterprise', function 
     $user->newSubscription('default', env('SPARK_STARTUP_MONTHLY_PLAN'))->create('pm_card_visa');
 
     // Cannot downgrade
-    expect(fn() => attemptPlanSwap($user, env('SPARK_STANDARD_MONTHLY_PLAN')))
+    expect(fn () => attemptPlanSwap($user, env('SPARK_STANDARD_MONTHLY_PLAN')))
         ->toThrow(ValidationException::class);
 
     // Can upgrade
@@ -371,7 +374,7 @@ test('user on trial cannot downgrade when usage exceeds target limit', function 
         ->trialDays(7)
         ->create('pm_card_visa');
 
-    expect(fn() => attemptPlanSwap($user, env('SPARK_STANDARD_MONTHLY_PLAN')))
+    expect(fn () => attemptPlanSwap($user, env('SPARK_STANDARD_MONTHLY_PLAN')))
         ->toThrow(ValidationException::class);
 });
 
