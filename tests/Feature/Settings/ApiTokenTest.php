@@ -50,6 +50,45 @@ test('token name is required', function () {
     expect($user->tokens()->count())->toBe(0);
 });
 
+test('token name must be unique per user', function () {
+    $user = User::factory()->create();
+
+    $user->createToken('Duplicate Token');
+
+    $response = $this
+        ->actingAs($user)
+        ->from(route('api-tokens.index'))
+        ->post(route('api-tokens.store'), [
+            'name' => 'Duplicate Token',
+        ]);
+
+    $response
+        ->assertSessionHasErrors('name')
+        ->assertRedirect(route('api-tokens.index'));
+
+    expect($user->fresh()->tokens()->count())->toBe(1);
+});
+
+test('different users can have tokens with the same name', function () {
+    $user1 = User::factory()->create();
+    $user2 = User::factory()->create();
+
+    $user1->createToken('Shared Name');
+
+    $response = $this
+        ->actingAs($user2)
+        ->post(route('api-tokens.store'), [
+            'name' => 'Shared Name',
+        ]);
+
+    $response
+        ->assertSessionHasNoErrors()
+        ->assertRedirect(route('api-tokens.index'));
+
+    expect($user2->fresh()->tokens()->count())->toBe(1);
+    expect($user2->tokens->first()->name)->toBe('Shared Name');
+});
+
 test('user can delete their own api token', function () {
     $user = User::factory()->create();
 
