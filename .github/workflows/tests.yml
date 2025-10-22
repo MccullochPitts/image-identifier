@@ -46,5 +46,10 @@ jobs:
       - name: Generate Application Key
         run: php artisan key:generate
 
+      - name: Set Stripe Keys
+        run: |
+          echo "STRIPE_KEY=${{ secrets.STRIPE_KEY }}" >> .env
+          echo "STRIPE_SECRET=${{ secrets.STRIPE_SECRET }}" >> .env
+
       - name: Tests
         run: ./vendor/bin/pest
