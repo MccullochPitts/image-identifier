@@ -48,6 +48,9 @@ jobs:
       - name: Generate Application Key
         run: php artisan key:generate
 
+      - name: Set Filesystem Disk for Tests
+        run: echo "FILESYSTEM_DISK=public" >> .env
+
       - name: Set Stripe Keys and Spark Plan IDs
         run: |
           echo "STRIPE_KEY=${{ secrets.STRIPE_KEY }}" >> .env
