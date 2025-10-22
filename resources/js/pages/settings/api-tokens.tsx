@@ -19,7 +19,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Transition } from '@headlessui/react';
 import { Form, Head, router, usePage } from '@inertiajs/react';
 import { CheckIcon, CopyIcon, TrashIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -44,8 +44,16 @@ export default function ApiTokens({ tokens }: { tokens: Token[] }) {
     const newToken = page.props.token;
     const newTokenName = page.props.tokenName;
 
+    // Derive dialog visibility from props (no state needed)
     const [showTokenDialog, setShowTokenDialog] = useState(!!newToken);
     const [copied, setCopied] = useState(false);
+
+    // Update dialog visibility when token prop changes
+    useEffect(() => {
+        // This is valid because we're synchronizing with external state (Inertia props)
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setShowTokenDialog(!!newToken);
+    }, [newToken]);
 
     const copyToClipboard = () => {
         if (newToken) {
