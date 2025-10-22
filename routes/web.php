@@ -16,4 +16,5 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->name('dashboard');
 });
 
+require __DIR__.'/api-web.php';
 require __DIR__.'/settings.php';

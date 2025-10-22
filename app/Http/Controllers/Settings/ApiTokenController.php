@@ -16,7 +16,7 @@ class ApiTokenController extends Controller
      */
     public function index(Request $request): Response
     {
-        return Inertia::render('settings/api-tokens', [
+        return Inertia::render('api/tokens', [
             'tokens' => $request->user()->tokens->map(fn ($token) => [
                 'id' => $token->id,
                 'name' => $token->name,

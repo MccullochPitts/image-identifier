@@ -13,7 +13,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
-import SettingsLayout from '@/layouts/settings/layout';
 import { index } from '@/routes/api-tokens';
 import { type BreadcrumbItem } from '@/types';
 import { Transition } from '@headlessui/react';
@@ -23,7 +22,11 @@ import { useEffect, useState } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
-        title: 'API Tokens',
+        title: 'API',
+        href: index().url,
+    },
+    {
+        title: 'Tokens',
         href: index().url,
     },
 ];
@@ -79,8 +82,8 @@ export default function ApiTokens({ tokens }: { tokens: Token[] }) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="API Tokens" />
 
-            <SettingsLayout>
-                <div className="space-y-6">
+            <div className="px-4 py-6">
+                <div className="mx-auto max-w-4xl space-y-6">
                     <HeadingSmall
                         title="API Tokens"
                         description="Manage API tokens for programmatic access to your account"
@@ -177,7 +180,7 @@ export default function ApiTokens({ tokens }: { tokens: Token[] }) {
                         </div>
                     )}
                 </div>
-            </SettingsLayout>
+            </div>
 
             {/* New Token Dialog */}
             <Dialog open={showTokenDialog} onOpenChange={setShowTokenDialog}>

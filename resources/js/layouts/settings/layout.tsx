@@ -2,7 +2,6 @@ import Heading from '@/components/heading';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { cn, isSameUrl, resolveUrl } from '@/lib/utils';
-import { index as apiTokensIndex } from '@/routes/api-tokens';
 import { edit as editAppearance } from '@/routes/appearance';
 import { edit } from '@/routes/profile';
 import { show } from '@/routes/two-factor';
@@ -25,11 +24,6 @@ const sidebarNavItems: NavItem[] = [
     {
         title: 'Two-Factor Auth',
         href: show(),
-        icon: null,
-    },
-    {
-        title: 'API Tokens',
-        href: apiTokensIndex(),
         icon: null,
     },
     {
