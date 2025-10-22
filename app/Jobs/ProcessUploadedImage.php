@@ -28,16 +28,27 @@ class ProcessUploadedImage implements ShouldQueue
             $this->image->update(['processing_status' => 'processing']);
 
             $disk = Storage::disk(config('filesystems.default'));
-            $filePath = $disk->path($this->image->path);
 
-            // Extract metadata (dimensions)
-            [$width, $height] = getimagesize($filePath);
+            // Check if file exists
+            if (! $disk->exists($this->image->path)) {
+                throw new \Exception('Image file not found: '.$this->image->path);
+            }
+
+            // Read file content from storage (works with both local and S3)
+            $fileContent = $disk->get($this->image->path);
+
+            // Load image with Intervention Image
+            $image = InterventionImage::read($fileContent);
+
+            // Extract dimensions
+            $width = $image->width();
+            $height = $image->height();
 
             // Calculate file hash for duplicate detection
-            $hash = hash_file('sha256', $filePath);
+            $hash = hash('sha256', $fileContent);
 
             // Generate thumbnail (300x300)
-            $thumbnail = InterventionImage::read($filePath);
+            $thumbnail = clone $image;
             $thumbnail->cover(300, 300);
 
             // Save thumbnail
