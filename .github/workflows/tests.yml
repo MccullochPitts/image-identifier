@@ -46,10 +46,16 @@ jobs:
       - name: Generate Application Key
         run: php artisan key:generate
 
-      - name: Set Stripe Keys
+      - name: Set Stripe Keys and Spark Plan IDs
         run: |
           echo "STRIPE_KEY=${{ secrets.STRIPE_KEY }}" >> .env
           echo "STRIPE_SECRET=${{ secrets.STRIPE_SECRET }}" >> .env
+          echo "SPARK_STANDARD_MONTHLY_PLAN=${{ secrets.SPARK_STANDARD_MONTHLY_PLAN }}" >> .env
+          echo "SPARK_STANDARD_YEARLY_PLAN=${{ secrets.SPARK_STANDARD_YEARLY_PLAN }}" >> .env
+          echo "SPARK_STARTUP_MONTHLY_PLAN=${{ secrets.SPARK_STARTUP_MONTHLY_PLAN }}" >> .env
+          echo "SPARK_STARTUP_YEARLY_PLAN=${{ secrets.SPARK_STARTUP_YEARLY_PLAN }}" >> .env
+          echo "SPARK_ENTERPRISE_MONTHLY_PLAN=${{ secrets.SPARK_ENTERPRISE_MONTHLY_PLAN }}" >> .env
+          echo "SPARK_ENTERPRISE_YEARLY_PLAN=${{ secrets.SPARK_ENTERPRISE_YEARLY_PLAN }}" >> .env
 
       - name: Tests
         run: ./vendor/bin/pest
