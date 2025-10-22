@@ -23,6 +23,8 @@ class ApiTokenController extends Controller
                 'last_used_at' => $token->last_used_at?->toISOString(),
                 'created_at' => $token->created_at->toISOString(),
             ]),
+            'token' => session('token'),
+            'tokenName' => session('tokenName'),
         ]);
     }
 
