@@ -292,6 +292,18 @@ php artisan tinker --execute="User::first()->subscription()"
 - Spark handles webhook registration and processing automatically
 - For custom billing logic, extend Spark's controllers or use Cashier methods directly
 
+### Laravel Sanctum Specifics
+- Sanctum provides API token authentication for SPAs and mobile applications
+- **Sanctum does NOT provide built-in UI or controllers** - you must create your own token management interface
+- Token creation: `$user->createToken('token-name')` returns `$token->plainTextToken` (only available once)
+- Token retrieval: `$user->tokens` to list all tokens
+- Token revocation: `$user->tokens()->where('id', $id)->delete()` or `$token->delete()`
+- Token abilities/scopes: `$user->createToken('name', ['ability1', 'ability2'])`
+- Middleware: Use `auth:sanctum` to protect API routes
+- The plain-text token is only available immediately after creation - must be shown to user once and copied
+- Tokens are stored hashed in `personal_access_tokens` table
+- For UI implementation: Build custom controllers/pages to create, list, and revoke tokens
+
 ### Database
 - Always use proper Eloquent relationship methods with return type hints. Prefer relationship methods over raw queries or manual joins.
 - Use Eloquent models and relationships before suggesting raw database queries
