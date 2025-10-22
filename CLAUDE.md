@@ -670,12 +670,45 @@ git branch -d feature/feature-name  # Delete local feature branch
 git push origin --delete feature/feature-name  # Delete remote if pushed
 ```
 
+### GitHub CLI & CI Verification
+
+**This project uses GitHub CLI (`gh`) to verify CI status before merging feature branches.**
+
+After pushing a feature branch, ALWAYS check that GitHub Actions passes before merging to `develop`:
+
+```bash
+# Check latest CI run status for your branch
+gh run list --branch feature/your-feature --limit 1
+
+# Watch a specific run (get ID from list command)
+gh run watch <run-id> --exit-status
+
+# If tests fail, view the error logs
+gh run view <run-id> --log-failed
+```
+
+**Critical CI Workflow:**
+1. Push feature branch to GitHub
+2. Wait for GitHub Actions to complete (both `linter` and `tests` workflows)
+3. Verify BOTH workflows show ✓ success
+4. Only then merge to `develop`
+5. If CI fails, fix issues in the feature branch and push again
+6. Repeat until CI is green
+
+**Why This Matters:**
+- `develop` auto-deploys to staging on Laravel Cloud
+- Broken code in `develop` = broken staging environment
+- CI is your quality gate - respect it
+- Faster to fix issues in feature branch than after merge
+
 ### Critical Rules
 - **NEVER commit directly to `main`** - Always go through `develop` first
 - **NEVER push to `develop` without user confirmation** - User must approve after seeing test results
+- **NEVER merge to `develop` until GitHub Actions is green** - Both linter and tests must pass
 - **ALWAYS check if behind before pushing** - Run `git fetch && git status` to check
 - **ALWAYS pull latest `develop` before creating feature branch** - Prevents merge conflicts
 - **ALWAYS run full quality checks before merge** - Pint, lint, tests, build
+- **ALWAYS verify CI passes on GitHub before merging** - Use `gh run list` to check
 - **NEVER merge broken code to `develop`** - Staging should always be deployable
 - **ALWAYS test on staging before production** - Use staging to catch issues
 
@@ -722,19 +755,35 @@ git fetch origin
 git status  # If behind...
 git pull origin develop
 
-# Run quality checks
+# Run quality checks locally
 vendor/bin/pint
 npm run lint
 php artisan test
 npm run build
 
-# All pass! Ask user for confirmation
+# All local checks pass! Push feature branch to GitHub
+git push origin feature/add-webhooks
+
+# CRITICAL: Wait for and verify GitHub Actions passes
+gh run list --branch feature/add-webhooks --limit 1
+# Wait for both 'linter' and 'tests' workflows to complete
+
+# Watch the test run (optional but recommended)
+gh run watch <run-id> --exit-status
+
+# Verify both workflows show ✓ success
+# If any failures, fix in feature branch and push again
+
+# CI is green! Ask user for confirmation
 # User says "yes, merge it"
 
 git checkout develop
 git pull origin develop  # Final check
 git merge feature/add-webhooks
 git push origin develop  # Deploys to staging
+
+# Verify CI passes on develop branch too
+gh run list --branch develop --limit 1
 
 # Test on staging, then when ready for production:
 git checkout main
@@ -743,6 +792,7 @@ git push origin main  # Deploys to production
 
 # Clean up
 git branch -d feature/add-webhooks
+git push origin --delete feature/add-webhooks
 ```
 
 
