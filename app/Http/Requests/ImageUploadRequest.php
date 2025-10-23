@@ -101,7 +101,32 @@ class ImageUploadRequest extends FormRequest
                 'images.*.file' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:10240',
                 'images.*.description' => 'nullable|string|max:5000',
                 'images.*.tags' => 'nullable|array',
-                'images.*.tags.*' => 'required|string|max:255',
+                'images.*.tags.*' => [
+                    'required',
+                    function ($attribute, $value, $fail) {
+                        // Support both string values and array of strings (for multi-value tags)
+                        if (is_string($value)) {
+                            if (strlen($value) > 255) {
+                                $fail("The {$attribute} must not exceed 255 characters.");
+                            }
+                        } elseif (is_array($value)) {
+                            foreach ($value as $item) {
+                                if (! is_string($item)) {
+                                    $fail("Each {$attribute} array item must be a string.");
+
+                                    return;
+                                }
+                                if (strlen($item) > 255) {
+                                    $fail("Each {$attribute} array item must not exceed 255 characters.");
+
+                                    return;
+                                }
+                            }
+                        } else {
+                            $fail("The {$attribute} must be a string or array of strings.");
+                        }
+                    },
+                ],
                 'images.*.requested_tags' => 'nullable|array',
                 'images.*.requested_tags.*' => 'required|string|max:100',
             ];
@@ -112,7 +137,32 @@ class ImageUploadRequest extends FormRequest
                 'images.*' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:10240',
                 'images_data.*.description' => 'nullable|string|max:5000',
                 'images_data.*.tags' => 'nullable|array',
-                'images_data.*.tags.*' => 'required|string|max:255',
+                'images_data.*.tags.*' => [
+                    'required',
+                    function ($attribute, $value, $fail) {
+                        // Support both string values and array of strings (for multi-value tags)
+                        if (is_string($value)) {
+                            if (strlen($value) > 255) {
+                                $fail("The {$attribute} must not exceed 255 characters.");
+                            }
+                        } elseif (is_array($value)) {
+                            foreach ($value as $item) {
+                                if (! is_string($item)) {
+                                    $fail("Each {$attribute} array item must be a string.");
+
+                                    return;
+                                }
+                                if (strlen($item) > 255) {
+                                    $fail("Each {$attribute} array item must not exceed 255 characters.");
+
+                                    return;
+                                }
+                            }
+                        } else {
+                            $fail("The {$attribute} must be a string or array of strings.");
+                        }
+                    },
+                ],
                 'images_data.*.requested_tags' => 'nullable|array',
                 'images_data.*.requested_tags.*' => 'required|string|max:100',
             ];

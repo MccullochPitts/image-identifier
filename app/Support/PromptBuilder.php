@@ -56,6 +56,7 @@ class PromptBuilder
         }
 
         $prompt .= "\n\nFor each tag, provide a confidence score between 0 and 1 indicating how certain you are about the value.";
+        $prompt .= "\n\nIMPORTANT: If you identify multiple items in a category (e.g., multiple characters, actors, or objects), return separate tag objects with the same key but different values. For example, if you see Woody and Buzz in an image, return: [{\"key\": \"character\", \"value\": \"woody\", \"confidence\": 0.95}, {\"key\": \"character\", \"value\": \"buzz\", \"confidence\": 0.9}]";
 
         return $prompt;
     }

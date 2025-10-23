@@ -17,24 +17,30 @@ class TagService
     /**
      * Attach user-provided tags to an image.
      * Tags are stored with confidence 1.0 and source 'provided'.
+     * Values can be strings or arrays of strings for multi-value tags.
      *
-     * @param  array<string, string>  $tags  Key-value pairs of tags
+     * @param  array<string, string|array<string>>  $tags  Key-value pairs of tags
      */
     public function attachProvidedTags(Image $image, array $tags): void
     {
         foreach ($tags as $key => $value) {
-            // Normalize before searching to match database storage
-            $tag = Tag::firstOrCreate([
-                'key' => strtolower(trim($key)),
-                'value' => strtolower(trim($value)),
-            ]);
+            // Support both single values and arrays of values
+            $values = is_array($value) ? $value : [$value];
 
-            // Attach to image with pivot data (avoid duplicates)
-            if (! $image->tags()->where('tag_id', $tag->id)->exists()) {
-                $image->tags()->attach($tag->id, [
-                    'confidence' => 1.0,
-                    'source' => 'provided',
+            foreach ($values as $val) {
+                // Normalize before searching to match database storage
+                $tag = Tag::firstOrCreate([
+                    'key' => strtolower(trim($key)),
+                    'value' => strtolower(trim($val)),
                 ]);
+
+                // Attach to image with pivot data (avoid duplicates)
+                if (! $image->tags()->where('tag_id', $tag->id)->exists()) {
+                    $image->tags()->attach($tag->id, [
+                        'confidence' => 1.0,
+                        'source' => 'provided',
+                    ]);
+                }
             }
         }
     }
