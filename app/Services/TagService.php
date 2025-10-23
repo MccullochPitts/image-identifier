@@ -70,14 +70,29 @@ class TagService
         // Build the prompt
         $promptData = $this->promptBuilder->buildPrompt($image, $requestedKeys);
 
-        // Get the full path to the image file
-        $imagePath = storage_path('app/public/'.$image->path);
+        // Get file from storage (works with both local and S3)
+        $disk = \Storage::disk(config('filesystems.default'));
 
-        // Call Gemini with the image
-        $response = $this->geminiProvider->callWithImage($imagePath, $promptData);
+        if (! $disk->exists($image->path)) {
+            throw new \Exception('Image file not found: '.$image->path);
+        }
 
-        // Extract tags from response
-        $generatedTags = collect($response['tags'] ?? []);
+        // Create a temporary file for Gemini API (required since Gemini needs a file path)
+        $tempPath = tempnam(sys_get_temp_dir(), 'img_');
+        file_put_contents($tempPath, $disk->get($image->path));
+
+        try {
+            // Call Gemini with the image
+            $response = $this->geminiProvider->callWithImage($tempPath, $promptData);
+
+            // Extract tags from response
+            $generatedTags = collect($response['tags'] ?? []);
+        } finally {
+            // Clean up temp file
+            if (file_exists($tempPath)) {
+                unlink($tempPath);
+            }
+        }
 
         // Store each tag with the image
         foreach ($generatedTags as $tagData) {
