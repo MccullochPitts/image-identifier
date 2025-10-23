@@ -32,7 +32,7 @@ class ImageController extends Controller
     public function store(ImageUploadRequest $request): JsonResponse
     {
         $uploadedImages = $this->imageService->uploadImages(
-            $request->file('images'),
+            $request->validated(),
             $request->user()
         );
 

@@ -3,11 +3,11 @@
 namespace App\Jobs;
 
 use App\Models\Image;
+use App\Services\ImageService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Intervention\Image\Laravel\Facades\Image as InterventionImage;
 
 class ProcessUploadedImage implements ShouldQueue
 {
@@ -21,7 +21,7 @@ class ProcessUploadedImage implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(): void
+    public function handle(ImageService $imageService): void
     {
         try {
             // Update status to processing
@@ -34,37 +34,14 @@ class ProcessUploadedImage implements ShouldQueue
                 throw new \Exception('Image file not found: '.$this->image->path);
             }
 
-            // Read file content from storage (works with both local and S3)
-            $fileContent = $disk->get($this->image->path);
+            // Process image via ImageService
+            $imageService->processImage($this->image);
 
-            // Load image with Intervention Image
-            $image = InterventionImage::read($fileContent);
+            // Mark as completed
+            $this->image->update(['processing_status' => 'completed']);
 
-            // Extract dimensions
-            $width = $image->width();
-            $height = $image->height();
-
-            // Calculate file hash for duplicate detection
-            $hash = hash('sha256', $fileContent);
-
-            // Generate thumbnail (300x300)
-            $thumbnail = clone $image;
-            $thumbnail->cover(300, 300);
-
-            // Save thumbnail
-            $thumbnailFilename = 'thumb_'.basename($this->image->path);
-            $thumbnailPath = 'thumbnails/'.$thumbnailFilename;
-
-            $disk->put($thumbnailPath, (string) $thumbnail->encode());
-
-            // Update image record with all metadata
-            $this->image->update([
-                'width' => $width,
-                'height' => $height,
-                'hash' => $hash,
-                'thumbnail_path' => $thumbnailPath,
-                'processing_status' => 'completed',
-            ]);
+            // Future: AI tagging
+            // $tagService->generateTags($this->image);
 
             Log::info('Image processed successfully', ['image_id' => $this->image->id]);
         } catch (\Exception $e) {

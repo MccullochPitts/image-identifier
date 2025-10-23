@@ -29,7 +29,9 @@ test('user can upload single image successfully', function () {
     $file = UploadedFile::fake()->image('test.jpg', 800, 600);
 
     $response = $this->actingAs($user)->postJson('/api/v1/images', [
-        'images' => [$file],
+        'images' => [
+            ['file' => $file],
+        ],
     ]);
 
     $response->assertStatus(201)
@@ -78,9 +80,9 @@ test('user can upload multiple images', function () {
         ->create('pm_card_visa');
 
     $files = [
-        UploadedFile::fake()->image('test1.jpg'),
-        UploadedFile::fake()->image('test2.png'),
-        UploadedFile::fake()->image('test3.jpg'),
+        ['file' => UploadedFile::fake()->image('test1.jpg')],
+        ['file' => UploadedFile::fake()->image('test2.png')],
+        ['file' => UploadedFile::fake()->image('test3.jpg')],
     ];
 
     $response = $this->actingAs($user)->postJson('/api/v1/images', [
@@ -110,8 +112,8 @@ test('upload is rejected when user exceeds quota', function () {
     // Standard plan has 1000 upload limit, user has 999 uploads
     // Trying to upload 2 images should fail (all-or-nothing)
     $files = [
-        UploadedFile::fake()->image('test1.jpg'),
-        UploadedFile::fake()->image('test2.jpg'),
+        ['file' => UploadedFile::fake()->image('test1.jpg')],
+        ['file' => UploadedFile::fake()->image('test2.jpg')],
     ];
 
     $response = $this->actingAs($user)->postJson('/api/v1/images', [
@@ -139,8 +141,8 @@ test('upload succeeds when user has exactly enough quota', function () {
 
     // User has 2 remaining uploads
     $files = [
-        UploadedFile::fake()->image('test1.jpg'),
-        UploadedFile::fake()->image('test2.jpg'),
+        ['file' => UploadedFile::fake()->image('test1.jpg')],
+        ['file' => UploadedFile::fake()->image('test2.jpg')],
     ];
 
     $response = $this->actingAs($user)->postJson('/api/v1/images', [
@@ -161,11 +163,13 @@ test('upload is rejected with invalid file type', function () {
     $file = UploadedFile::fake()->create('document.pdf', 100);
 
     $response = $this->actingAs($user)->postJson('/api/v1/images', [
-        'images' => [$file],
+        'images' => [
+            ['file' => $file],
+        ],
     ]);
 
     $response->assertStatus(422)
-        ->assertJsonValidationErrors(['images.0']);
+        ->assertJsonValidationErrors(['images.0.file']);
 
     expect(Image::count())->toBe(0);
 });
@@ -179,11 +183,13 @@ test('upload is rejected when file is too large', function () {
     $file = UploadedFile::fake()->image('huge.jpg')->size(11 * 1024);
 
     $response = $this->actingAs($user)->postJson('/api/v1/images', [
-        'images' => [$file],
+        'images' => [
+            ['file' => $file],
+        ],
     ]);
 
     $response->assertStatus(422)
-        ->assertJsonValidationErrors(['images.0']);
+        ->assertJsonValidationErrors(['images.0.file']);
 
     expect(Image::count())->toBe(0);
 });
@@ -192,7 +198,9 @@ test('upload requires authentication', function () {
     $file = UploadedFile::fake()->image('test.jpg');
 
     $response = $this->postJson('/api/v1/images', [
-        'images' => [$file],
+        'images' => [
+            ['file' => $file],
+        ],
     ]);
 
     $response->assertStatus(401);
@@ -217,7 +225,9 @@ test('user without subscription cannot upload', function () {
     $file = UploadedFile::fake()->image('test.jpg');
 
     $response = $this->actingAs($user)->postJson('/api/v1/images', [
-        'images' => [$file],
+        'images' => [
+            ['file' => $file],
+        ],
     ]);
 
     $response->assertStatus(403);

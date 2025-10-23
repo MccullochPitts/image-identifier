@@ -10,24 +10,45 @@ use Illuminate\Support\Str;
 
 class ImageService
 {
+    public function __construct(protected TagService $tagService) {}
+
     /**
      * Upload images for a user.
      *
-     * @param  array<UploadedFile>  $files
+     * @param  array{images: array<array{file: UploadedFile, description?: string, tags?: array<string, string>, requested_tags?: array<string>}>}  $data
      * @return array<Image>
      */
-    public function uploadImages(array $files, User $user): array
+    public function uploadImages(array $data, User $user): array
     {
         $uploadedImages = [];
 
-        foreach ($files as $file) {
-            $image = $this->uploadSingleImage($file, $user);
+        foreach ($data['images'] as $imageData) {
+            // Upload file and create image record
+            $image = $this->uploadSingleImage($imageData['file'], $user);
+
+            // Set description if provided
+            if (! empty($imageData['description'])) {
+                $image->description = $imageData['description'];
+            }
+
+            // Store requested_tags in metadata for future AI processing
+            if (! empty($imageData['requested_tags'])) {
+                $image->metadata = ['requested_tags' => $imageData['requested_tags']];
+            }
+
+            $image->save();
+
+            // Attach user-provided tags via TagService
+            if (! empty($imageData['tags'])) {
+                $this->tagService->attachProvidedTags($image, $imageData['tags']);
+            }
+
             $uploadedImages[] = $image;
 
             // Increment user's upload count
             $user->incrementUploads();
 
-            // Dispatch job to process image (thumbnails, metadata, hash)
+            // Dispatch job to process image (thumbnails, hash, dimensions)
             dispatch(new \App\Jobs\ProcessUploadedImage($image));
         }
 
@@ -114,5 +135,63 @@ class ImageService
             ->where('user_id', $user->id)
             ->get()
             ->toArray();
+    }
+
+    /**
+     * Process image: extract metadata, generate thumbnail, calculate hash.
+     */
+    public function processImage(Image $image): void
+    {
+        $this->extractMetadata($image);
+        $this->generateThumbnail($image);
+        $this->calculateHash($image);
+    }
+
+    /**
+     * Extract width and height from image.
+     */
+    public function extractMetadata(Image $image): void
+    {
+        $disk = Storage::disk(config('filesystems.default'));
+        $fileContent = $disk->get($image->path);
+        $interventionImage = \Intervention\Image\Laravel\Facades\Image::read($fileContent);
+
+        $image->update([
+            'width' => $interventionImage->width(),
+            'height' => $interventionImage->height(),
+        ]);
+    }
+
+    /**
+     * Generate thumbnail for image.
+     */
+    public function generateThumbnail(Image $image): void
+    {
+        $disk = Storage::disk(config('filesystems.default'));
+        $fileContent = $disk->get($image->path);
+        $interventionImage = \Intervention\Image\Laravel\Facades\Image::read($fileContent);
+
+        // Generate 300x300 thumbnail
+        $thumbnail = clone $interventionImage;
+        $thumbnail->cover(300, 300);
+
+        $thumbnailFilename = 'thumb_'.basename($image->path);
+        $thumbnailPath = 'thumbnails/'.$thumbnailFilename;
+
+        $disk->put($thumbnailPath, (string) $thumbnail->encode());
+
+        $image->update(['thumbnail_path' => $thumbnailPath]);
+    }
+
+    /**
+     * Calculate SHA256 hash for duplicate detection.
+     */
+    public function calculateHash(Image $image): void
+    {
+        $disk = Storage::disk(config('filesystems.default'));
+        $fileContent = $disk->get($image->path);
+        $hash = hash('sha256', $fileContent);
+
+        $image->update(['hash' => $hash]);
     }
 }

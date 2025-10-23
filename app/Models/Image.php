@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Image extends Model
@@ -16,6 +17,7 @@ class Image extends Model
         'user_id',
         'filename',
         'path',
+        'description',
         'thumbnail_path',
         'mime_type',
         'size',
@@ -51,6 +53,13 @@ class Image extends Model
     public function children(): HasMany
     {
         return $this->hasMany(Image::class, 'parent_id');
+    }
+
+    public function tags(): BelongsToMany
+    {
+        return $this->belongsToMany(Tag::class)
+            ->withPivot(['confidence', 'source'])
+            ->withTimestamps();
     }
 
     public function isOriginal(): bool

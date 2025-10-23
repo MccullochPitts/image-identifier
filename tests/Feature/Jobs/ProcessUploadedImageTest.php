@@ -3,6 +3,7 @@
 use App\Jobs\ProcessUploadedImage;
 use App\Models\Image;
 use App\Models\User;
+use App\Services\ImageService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Queue;
@@ -37,7 +38,7 @@ test('job extracts image dimensions', function () {
 
     // Process the job
     $job = new ProcessUploadedImage($image);
-    $job->handle();
+    $job->handle(app(ImageService::class));
 
     // Refresh the image from database
     $image->refresh();
@@ -66,7 +67,7 @@ test('job generates thumbnail', function () {
     ]);
 
     $job = new ProcessUploadedImage($image);
-    $job->handle();
+    $job->handle(app(ImageService::class));
 
     $image->refresh();
 
@@ -93,7 +94,7 @@ test('job calculates file hash for duplicate detection', function () {
     ]);
 
     $job = new ProcessUploadedImage($image);
-    $job->handle();
+    $job->handle(app(ImageService::class));
 
     $image->refresh();
 
@@ -122,7 +123,7 @@ test('job updates processing status to completed', function () {
     expect($image->processing_status)->toBe('pending');
 
     $job = new ProcessUploadedImage($image);
-    $job->handle();
+    $job->handle(app(ImageService::class));
 
     $image->refresh();
 
@@ -146,7 +147,7 @@ test('job marks status as failed when image file is missing', function () {
     $job = new ProcessUploadedImage($image);
 
     try {
-        $job->handle();
+        $job->handle(app(ImageService::class));
     } catch (\Exception $e) {
         // Job should throw exception after marking as failed
     }
@@ -190,7 +191,7 @@ test('job processes different image sizes correctly', function ($width, $height)
     ]);
 
     $job = new ProcessUploadedImage($image);
-    $job->handle();
+    $job->handle(app(ImageService::class));
 
     $image->refresh();
 
