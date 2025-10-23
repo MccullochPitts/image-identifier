@@ -604,7 +604,8 @@ This project uses a three-environment setup:
 
 ### Automated Feature Development Workflow
 
-**This project uses GitHub Actions to automatically merge feature branches when all tests pass.**
+**CRITICAL: This project uses GitHub Actions to automatically merge feature branches.**
+**Claude should ONLY push feature branches - NEVER manually merge to `develop`.**
 
 **1. Start New Feature**
 ```bash
@@ -641,12 +642,19 @@ php artisan test         # All tests must pass
 npm run build            # Ensure build works
 ```
 
-**4. Push Feature Branch**
+**4. Push Feature Branch (STOP HERE - Do Not Merge!)**
 ```bash
 git push origin feature/feature-name
 ```
 
-**5. Automated Merge Process**
+**IMPORTANT: After pushing, Claude's job is DONE. Do NOT:**
+- ❌ `git checkout develop`
+- ❌ `git merge feature/feature-name`
+- ❌ `git push origin develop`
+
+**GitHub Actions will handle the merge automatically. Just push and wait.**
+
+**5. Automated Merge Process (Handled by GitHub Actions)**
 Once you push, GitHub Actions automatically:
 - ✅ Runs linter workflow (Pint, Prettier, ESLint)
 - ✅ Runs tests workflow (full Pest test suite)
@@ -703,14 +711,25 @@ git pull origin develop
 git branch -d feature/feature-name  # Delete local branch
 ```
 
-### Critical Rules
+### Critical Rules for Claude
+
+**❌ NEVER DO THESE:**
 - **NEVER commit directly to `main` or `develop`** - Always use feature branches
+- **NEVER manually merge feature branches to `develop`** - This is the most common mistake!
 - **NEVER push directly to `develop`** - Auto-merge handles this after tests pass
+- **NEVER run `git merge` commands** - GitHub Actions does the merging
+
+**✅ ALWAYS DO THESE:**
+- **ALWAYS push feature branches and stop** - Let GitHub Actions handle the merge
 - **ALWAYS run quality checks before pushing** - Pint, lint, tests, build locally first
 - **ALWAYS pull latest `develop` before creating feature branch** - Prevents merge conflicts
 - **ALWAYS check if behind before pushing** - Run `git fetch && git status` to check
 - **ALWAYS test on staging before production** - Use staging to catch issues
-- **Auto-merge will reject out-of-date branches** - Update and re-test if another branch merges first
+
+**ℹ️ Auto-merge Process:**
+- Auto-merge will reject out-of-date branches - Update and re-test if another branch merges first
+- Feature branches are automatically deleted after successful merge
+- Develop automatically deploys to staging after merge
 
 ### When Behind Develop
 If `git status` shows "Your branch is behind 'origin/develop'":
