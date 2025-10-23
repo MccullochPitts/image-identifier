@@ -602,12 +602,33 @@ This project uses a three-environment setup:
 - `feature/*` - Individual feature development (e.g., `feature/spark-subscriptions`, `feature/image-tagging`)
 - `hotfix/*` - Emergency production fixes only
 
+### CRITICAL RULE: All Work Must Be Done in Feature Branches
+
+**❌ NEVER work directly on `develop` or `main` branches**
+**✅ ALWAYS create a feature branch for ANY changes**
+
+This applies to:
+- New features (no matter how small)
+- Bug fixes
+- Documentation updates
+- Configuration changes
+- Dependency updates
+- ANY code modification whatsoever
+
+**The ONLY exception**: Emergency hotfixes that go directly to `main` (rare, requires user approval)
+
+**Why this matters:**
+- `develop` auto-deploys to staging - direct commits bypass CI/CD
+- Feature branches ensure all changes go through automated testing
+- Auto-merge workflow only works with feature branches
+- Protects staging and production from untested code
+
 ### Automated Feature Development Workflow
 
 **CRITICAL: This project uses GitHub Actions to automatically merge feature branches.**
 **Claude should ONLY push feature branches - NEVER manually merge to `develop`.**
 
-**1. Start New Feature**
+**1. Start New Feature (ALWAYS from develop)**
 ```bash
 git checkout develop
 git pull origin develop  # Always pull latest before branching
@@ -714,12 +735,16 @@ git branch -d feature/feature-name  # Delete local branch
 ### Critical Rules for Claude
 
 **❌ NEVER DO THESE:**
+- **NEVER work directly on `develop` or `main` branches** - ALL work must be in feature branches
 - **NEVER commit directly to `main` or `develop`** - Always use feature branches
+- **NEVER start coding on `develop`** - Always create a feature branch first
 - **NEVER manually merge feature branches to `develop`** - This is the most common mistake!
 - **NEVER push directly to `develop`** - Auto-merge handles this after tests pass
 - **NEVER run `git merge` commands** - GitHub Actions does the merging
 
 **✅ ALWAYS DO THESE:**
+- **ALWAYS create a feature branch before starting ANY work** - Even for documentation
+- **ALWAYS branch from `develop`** - Never branch from another feature branch
 - **ALWAYS push feature branches and stop** - Let GitHub Actions handle the merge
 - **ALWAYS run quality checks before pushing** - Pint, lint, tests, build locally first
 - **ALWAYS pull latest `develop` before creating feature branch** - Prevents merge conflicts
