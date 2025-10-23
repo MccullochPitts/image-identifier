@@ -4,9 +4,16 @@ namespace App\Services;
 
 use App\Models\Image;
 use App\Models\Tag;
+use App\Services\Providers\GeminiProvider;
+use App\Support\PromptBuilder;
 
 class TagService
 {
+    public function __construct(
+        protected GeminiProvider $geminiProvider,
+        protected PromptBuilder $promptBuilder
+    ) {}
+
     /**
      * Attach user-provided tags to an image.
      * Tags are stored with confidence 1.0 and source 'provided'.
@@ -48,5 +55,50 @@ class TagService
     public function getImageTags(Image $image): \Illuminate\Database\Eloquent\Collection
     {
         return $image->tags()->withPivot(['confidence', 'source'])->get();
+    }
+
+    /**
+     * Generate AI tags for an image using Gemini.
+     *
+     * @param  array<string>|null  $requestedKeys  Optional specific tag keys to fill
+     * @return \Illuminate\Support\Collection Collection of generated tags
+     *
+     * @throws \Exception
+     */
+    public function generateTags(Image $image, ?array $requestedKeys = null): \Illuminate\Support\Collection
+    {
+        // Build the prompt
+        $promptData = $this->promptBuilder->buildPrompt($image, $requestedKeys);
+
+        // Get the full path to the image file
+        $imagePath = storage_path('app/public/'.$image->path);
+
+        // Call Gemini with the image
+        $response = $this->geminiProvider->callWithImage($imagePath, $promptData);
+
+        // Extract tags from response
+        $generatedTags = collect($response['tags'] ?? []);
+
+        // Store each tag with the image
+        foreach ($generatedTags as $tagData) {
+            // Find or create the tag
+            $tag = Tag::firstOrCreate([
+                'key' => $tagData['key'],
+                'value' => $tagData['value'],
+            ]);
+
+            // Determine source: 'requested' if this was a requested key, otherwise 'generated'
+            $source = ($requestedKeys !== null && in_array($tagData['key'], $requestedKeys)) ? 'requested' : 'generated';
+
+            // Attach to image with pivot data (avoid duplicates)
+            if (! $image->tags()->where('tag_id', $tag->id)->exists()) {
+                $image->tags()->attach($tag->id, [
+                    'confidence' => $tagData['confidence'],
+                    'source' => $source,
+                ]);
+            }
+        }
+
+        return $generatedTags;
     }
 }

@@ -40,8 +40,8 @@ class ProcessUploadedImage implements ShouldQueue
             // Mark as completed
             $this->image->update(['processing_status' => 'completed']);
 
-            // Future: AI tagging
-            // $tagService->generateTags($this->image);
+            // Dispatch AI tagging job
+            GenerateTags::dispatch($this->image);
 
             Log::info('Image processed successfully', ['image_id' => $this->image->id]);
         } catch (\Exception $e) {
