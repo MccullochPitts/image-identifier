@@ -1,0 +1,121 @@
+name: auto-merge
+
+on:
+  workflow_run:
+    workflows: ["linter", "tests"]
+    types:
+      - completed
+    branches:
+      - 'feature/**'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+      - name: Check if all required workflows passed
+        id: check-workflows
+        run: |
+          BRANCH="${{ github.event.workflow_run.head_branch }}"
+          echo "Checking workflows for branch: $BRANCH"
+
+          # Get the latest workflow runs for this branch
+          LINTER_STATUS=$(gh run list --branch "$BRANCH" --workflow=linter --limit 1 --json conclusion --jq '.[0].conclusion')
+          TESTS_STATUS=$(gh run list --branch "$BRANCH" --workflow=tests --limit 1 --json conclusion --jq '.[0].conclusion')
+
+          echo "Linter status: $LINTER_STATUS"
+          echo "Tests status: $TESTS_STATUS"
+
+          if [[ "$LINTER_STATUS" == "success" && "$TESTS_STATUS" == "success" ]]; then
+            echo "all_passed=true" >> $GITHUB_OUTPUT
+            echo "All workflows passed! ✅"
+          else
+            echo "all_passed=false" >> $GITHUB_OUTPUT
+            echo "Not all workflows passed yet."
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check if branch is up-to-date with develop
+        if: steps.check-workflows.outputs.all_passed == 'true'
+        id: check-up-to-date
+        run: |
+          BRANCH="${{ github.event.workflow_run.head_branch }}"
+
+          # Fetch latest
+          git fetch origin develop
+          git fetch origin "$BRANCH"
+
+          # Check if feature branch is behind develop
+          BEHIND=$(git rev-list --count origin/"$BRANCH"..origin/develop)
+
+          if [ "$BEHIND" -gt 0 ]; then
+            echo "❌ Branch $BRANCH is $BEHIND commits behind develop!"
+            echo "Another branch was merged while tests were running."
+            echo "Please update your branch and push again:"
+            echo "  git checkout $BRANCH"
+            echo "  git pull origin develop"
+            echo "  git push origin $BRANCH"
+            echo "up_to_date=false" >> $GITHUB_OUTPUT
+            exit 1
+          else
+            echo "✅ Branch is up-to-date with develop"
+            echo "up_to_date=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Merge to develop
+        if: steps.check-workflows.outputs.all_passed == 'true' && steps.check-up-to-date.outputs.up_to_date == 'true'
+        run: |
+          BRANCH="${{ github.event.workflow_run.head_branch }}"
+          echo "Merging $BRANCH to develop..."
+
+          # Checkout develop
+          git checkout develop
+          git pull origin develop
+
+          # Merge feature branch
+          if git merge --no-ff origin/"$BRANCH" -m "Auto-merge $BRANCH to develop [skip ci]"; then
+            echo "Merge successful!"
+
+            # Push to develop
+            git push origin develop
+
+            echo "Successfully merged $BRANCH to develop and pushed!"
+            echo "Staging deployment will begin automatically."
+          else
+            echo "❌ Merge conflict detected!"
+            echo "Manual intervention required to resolve conflicts."
+            exit 1
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete feature branch
+        if: steps.check-workflows.outputs.all_passed == 'true' && success()
+        run: |
+          BRANCH="${{ github.event.workflow_run.head_branch }}"
+          echo "Deleting merged branch: $BRANCH"
+          git push origin --delete "$BRANCH" || echo "Branch already deleted or unable to delete"
+
+      - name: Comment on failure
+        if: failure()
+        run: |
+          BRANCH="${{ github.event.workflow_run.head_branch }}"
+          echo "Auto-merge failed for branch: $BRANCH"
+          echo "Check the logs for details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

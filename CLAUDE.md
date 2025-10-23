@@ -602,7 +602,9 @@ This project uses a three-environment setup:
 - `feature/*` - Individual feature development (e.g., `feature/spark-subscriptions`, `feature/image-tagging`)
 - `hotfix/*` - Emergency production fixes only
 
-### Standard Feature Development Workflow
+### Automated Feature Development Workflow
+
+**This project uses GitHub Actions to automatically merge feature branches when all tests pass.**
 
 **1. Start New Feature**
 ```bash
@@ -616,8 +618,8 @@ git checkout -b feature/feature-name
 - Commit frequently with logical, atomic changes
 - Run quality checks before each commit (Pint, linting, tests)
 
-**3. Before Pushing Feature to Develop**
-CRITICAL: You MUST complete ALL these steps and get user confirmation:
+**3. Before Pushing Feature Branch**
+CRITICAL: You MUST complete ALL these steps locally:
 
 a. **Check if behind develop**:
 ```bash
@@ -639,25 +641,53 @@ php artisan test         # All tests must pass
 npm run build            # Ensure build works
 ```
 
-d. **Ask user for confirmation**:
-- "All tests pass locally. Ready to merge feature/X to develop?"
-- Only proceed after explicit user approval
-
-e. **Merge to develop** (after user confirmation):
+**4. Push Feature Branch**
 ```bash
-git checkout develop
-git pull origin develop  # Final check for latest
-git merge feature/feature-name
-git push origin develop  # Auto-deploys to staging
+git push origin feature/feature-name
 ```
 
-**4. Test on Staging**
-- Staging automatically deploys when you push to `develop`
+**5. Automated Merge Process**
+Once you push, GitHub Actions automatically:
+- ✅ Runs linter workflow (Pint, Prettier, ESLint)
+- ✅ Runs tests workflow (full Pest test suite)
+- ✅ **Checks branch is up-to-date** with develop (prevents merge race conditions)
+- ✅ **If all checks pass**: Auto-merges to `develop` and deploys to staging
+- ✅ **Deletes the feature branch** after successful merge
+- ❌ **If workflows fail**: No merge happens, fix issues and push again
+- ❌ **If branch is behind develop**: Must update branch and re-test
+
+**You don't need to manually merge - GitHub Actions handles it!**
+
+**Merge Race Condition Protection:**
+If another branch merges to develop while your tests are running:
+- Auto-merge will detect your branch is out-of-date
+- You'll get a notification to update your branch:
+  ```bash
+  git checkout feature/your-feature
+  git pull origin develop
+  git push origin feature/your-feature
+  ```
+- Tests will re-run with the latest develop code
+- Auto-merge will succeed if tests still pass
+
+**6. Monitor Automated Merge**
+Watch the GitHub Actions tab to see:
+- When tests complete
+- When auto-merge happens
+- Any merge conflicts or failures
+
+Check your GitHub notifications or the Actions tab:
+```bash
+gh run list --branch feature/your-feature --limit 3
+```
+
+**7. Test on Staging**
+- After auto-merge, staging automatically deploys
 - Test the feature on staging environment
 - Verify logs on Laravel Cloud staging
 - Test with actual Stripe in test mode, real S3, etc.
 
-**5. Deploy to Production** (only after staging verification):
+**8. Deploy to Production** (only after staging verification)
 ```bash
 git checkout main
 git pull origin main
@@ -665,53 +695,22 @@ git merge develop
 git push origin main  # Auto-deploys to production
 ```
 
-**6. Clean Up**
+**9. Clean Up**
+Feature branch is automatically deleted after merge. Just update your local:
 ```bash
-git branch -d feature/feature-name  # Delete local feature branch
-git push origin --delete feature/feature-name  # Delete remote if pushed
+git checkout develop
+git pull origin develop
+git branch -d feature/feature-name  # Delete local branch
 ```
-
-### GitHub CLI & CI Verification
-
-**This project uses GitHub CLI (`gh`) to verify CI status before merging feature branches.**
-
-After pushing a feature branch, ALWAYS check that GitHub Actions passes before merging to `develop`:
-
-```bash
-# Check latest CI run status for your branch
-gh run list --branch feature/your-feature --limit 1
-
-# Watch a specific run (get ID from list command)
-gh run watch <run-id> --exit-status
-
-# If tests fail, view the error logs
-gh run view <run-id> --log-failed
-```
-
-**Critical CI Workflow:**
-1. Push feature branch to GitHub
-2. Wait for GitHub Actions to complete (both `linter` and `tests` workflows)
-3. Verify BOTH workflows show ✓ success
-4. Only then merge to `develop`
-5. If CI fails, fix issues in the feature branch and push again
-6. Repeat until CI is green
-
-**Why This Matters:**
-- `develop` auto-deploys to staging on Laravel Cloud
-- Broken code in `develop` = broken staging environment
-- CI is your quality gate - respect it
-- Faster to fix issues in feature branch than after merge
 
 ### Critical Rules
-- **NEVER commit directly to `main`** - Always go through `develop` first
-- **NEVER push to `develop` without user confirmation** - User must approve after seeing test results
-- **NEVER merge to `develop` until GitHub Actions is green** - Both linter and tests must pass
-- **ALWAYS check if behind before pushing** - Run `git fetch && git status` to check
+- **NEVER commit directly to `main` or `develop`** - Always use feature branches
+- **NEVER push directly to `develop`** - Auto-merge handles this after tests pass
+- **ALWAYS run quality checks before pushing** - Pint, lint, tests, build locally first
 - **ALWAYS pull latest `develop` before creating feature branch** - Prevents merge conflicts
-- **ALWAYS run full quality checks before merge** - Pint, lint, tests, build
-- **ALWAYS verify CI passes on GitHub before merging** - Use `gh run list` to check
-- **NEVER merge broken code to `develop`** - Staging should always be deployable
+- **ALWAYS check if behind before pushing** - Run `git fetch && git status` to check
 - **ALWAYS test on staging before production** - Use staging to catch issues
+- **Auto-merge will reject out-of-date branches** - Update and re-test if another branch merges first
 
 ### When Behind Develop
 If `git status` shows "Your branch is behind 'origin/develop'":
@@ -737,7 +736,7 @@ Use clear, descriptive commit messages:
 - ❌ "changes"
 - ❌ "wip"
 
-### Example Complete Workflow
+### Example Complete Workflow with Auto-Merge
 ```bash
 # Starting new feature
 git checkout develop
@@ -751,7 +750,7 @@ git commit -m "Add webhook delivery system with HMAC signatures"
 # ... more work ...
 git commit -m "Add tests for webhook signature validation"
 
-# Ready to merge - check if behind
+# Ready to push - check if behind
 git fetch origin
 git status  # If behind...
 git pull origin develop
@@ -762,38 +761,28 @@ npm run lint
 php artisan test
 npm run build
 
-# All local checks pass! Push feature branch to GitHub
+# All local checks pass! Push feature branch
 git push origin feature/add-webhooks
 
-# CRITICAL: Wait for and verify GitHub Actions passes
-gh run list --branch feature/add-webhooks --limit 1
-# Wait for both 'linter' and 'tests' workflows to complete
+# GitHub Actions automatically:
+# 1. Runs linter and tests workflows
+# 2. Checks branch is up-to-date with develop
+# 3. Auto-merges to develop if all pass
+# 4. Deletes feature/add-webhooks
+# 5. Deploys to staging
 
-# Watch the test run (optional but recommended)
-gh run watch <run-id> --exit-status
+# Monitor progress (optional)
+gh run list --branch feature/add-webhooks --limit 3
 
-# Verify both workflows show ✓ success
-# If any failures, fix in feature branch and push again
-
-# CI is green! Ask user for confirmation
-# User says "yes, merge it"
-
+# Update local after auto-merge
 git checkout develop
-git pull origin develop  # Final check
-git merge feature/add-webhooks
-git push origin develop  # Deploys to staging
-
-# Verify CI passes on develop branch too
-gh run list --branch develop --limit 1
+git pull origin develop
+git branch -d feature/add-webhooks  # Clean up local
 
 # Test on staging, then when ready for production:
 git checkout main
 git merge develop
 git push origin main  # Deploys to production
-
-# Clean up
-git branch -d feature/add-webhooks
-git push origin --delete feature/add-webhooks
 ```
 
 
