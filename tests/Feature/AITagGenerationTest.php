@@ -7,7 +7,6 @@ use App\Services\Providers\GeminiProvider;
 use App\Services\TagService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 
 use function Pest\Laravel\mock;
@@ -124,9 +123,7 @@ test('generate tags job calls tag service', function () {
         ->and($image->tags()->where('key', 'type')->exists())->toBeTrue();
 });
 
-test('process uploaded image job dispatches generate tags job', function () {
-    Queue::fake();
-
+test('process uploaded image job calls tag service to generate tags', function () {
     $user = User::factory()->create();
     $file = UploadedFile::fake()->image('test.jpg');
     Storage::disk('public')->put('images/test.jpg', $file->getContent());
@@ -137,11 +134,23 @@ test('process uploaded image job dispatches generate tags job', function () {
         'processing_status' => 'pending',
     ]);
 
-    // Dispatch ProcessUploadedImage job
-    \App\Jobs\ProcessUploadedImage::dispatch($image);
+    // Mock GeminiProvider to return tags
+    $mock = mock(GeminiProvider::class);
+    $mock->shouldReceive('callWithImage')
+        ->once()
+        ->andReturn([
+            'tags' => [
+                ['key' => 'test', 'value' => 'auto-generated', 'confidence' => 0.9],
+            ],
+        ]);
 
-    // Process the queue
-    Queue::assertPushed(\App\Jobs\ProcessUploadedImage::class);
+    // Execute ProcessUploadedImage job
+    $job = new \App\Jobs\ProcessUploadedImage($image);
+    $job->handle(app(\App\Services\ImageService::class), app(TagService::class));
+
+    // Assert tags were generated
+    expect($image->fresh()->tags()->count())->toBe(1)
+        ->and($image->tags()->where('key', 'test')->exists())->toBeTrue();
 });
 
 test('tag generation handles gemini api errors gracefully', function () {

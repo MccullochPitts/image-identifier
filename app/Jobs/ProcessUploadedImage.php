@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Image;
 use App\Services\ImageService;
+use App\Services\TagService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -21,7 +22,7 @@ class ProcessUploadedImage implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(ImageService $imageService): void
+    public function handle(ImageService $imageService, TagService $tagService): void
     {
         try {
             // Update status to processing
@@ -40,8 +41,16 @@ class ProcessUploadedImage implements ShouldQueue
             // Mark as completed
             $this->image->update(['processing_status' => 'completed']);
 
-            // Dispatch AI tagging job
-            GenerateTags::dispatch($this->image);
+            // Generate AI tags automatically (don't fail the upload if this fails)
+            try {
+                $tagService->generateTags($this->image);
+                Log::info('AI tags generated successfully', ['image_id' => $this->image->id]);
+            } catch (\Exception $e) {
+                Log::warning('AI tag generation failed', [
+                    'image_id' => $this->image->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
 
             Log::info('Image processed successfully', ['image_id' => $this->image->id]);
         } catch (\Exception $e) {
