@@ -23,10 +23,10 @@ class TagService
     public function attachProvidedTags(Image $image, array $tags): void
     {
         foreach ($tags as $key => $value) {
-            // Find or create the tag
+            // Normalize before searching to match database storage
             $tag = Tag::firstOrCreate([
-                'key' => $key,
-                'value' => $value,
+                'key' => strtolower(trim($key)),
+                'value' => strtolower(trim($value)),
             ]);
 
             // Attach to image with pivot data (avoid duplicates)
@@ -96,10 +96,10 @@ class TagService
 
         // Store each tag with the image
         foreach ($generatedTags as $tagData) {
-            // Find or create the tag
+            // Normalize before searching to match database storage
             $tag = Tag::firstOrCreate([
-                'key' => $tagData['key'],
-                'value' => $tagData['value'],
+                'key' => strtolower(trim($tagData['key'])),
+                'value' => strtolower(trim($tagData['value'])),
             ]);
 
             // Determine source: 'requested' if this was a requested key, otherwise 'generated'
