@@ -33,21 +33,90 @@ class ImageUploadRequest extends FormRequest
     }
 
     /**
+     * Get the validated data from the request - override to restructure multipart data.
+     *
+     * This handles both JSON (for tests) and multipart/form-data (for real API calls).
+     */
+    public function validated($key = null, $default = null)
+    {
+        $validated = parent::validated($key, $default);
+
+        // Check if images[0] is already an array with 'file' key (JSON format from tests)
+        if (isset($validated['images'][0]) && is_array($validated['images'][0]) && isset($validated['images'][0]['file'])) {
+            // Already in correct format, just return
+            return $validated;
+        }
+
+        // Check if images[0] is an UploadedFile (multipart format from Postman)
+        if (isset($validated['images'][0]) && $validated['images'][0] instanceof \Illuminate\Http\UploadedFile) {
+            // Restructure multipart/form-data format
+            $imagesData = $this->input('images_data', []);
+            $restructured = [];
+
+            foreach ($validated['images'] as $index => $file) {
+                $imageData = ['file' => $file];
+
+                // Add metadata if provided for this index
+                if (isset($imagesData[$index])) {
+                    $data = $imagesData[$index];
+
+                    if (isset($data['description'])) {
+                        $imageData['description'] = $data['description'];
+                    }
+
+                    if (isset($data['tags'])) {
+                        $imageData['tags'] = $data['tags'];
+                    }
+
+                    if (isset($data['requested_tags'])) {
+                        $imageData['requested_tags'] = $data['requested_tags'];
+                    }
+                }
+
+                $restructured[] = $imageData;
+            }
+
+            $validated['images'] = $restructured;
+        }
+
+        return $validated;
+    }
+
+    /**
      * Get the validation rules that apply to the request.
      *
      * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
-        return [
-            'images' => 'required|array|min:1|max:50', // Allow up to 50 images at once
-            'images.*.file' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:10240', // Max 10MB per image
-            'images.*.description' => 'nullable|string|max:5000',
-            'images.*.tags' => 'nullable|array',
-            'images.*.tags.*' => 'required|string|max:255', // Tag values must be strings
-            'images.*.requested_tags' => 'nullable|array',
-            'images.*.requested_tags.*' => 'required|string|max:100', // Tag keys must be strings
-        ];
+        // Detect format: if first image is an array, it's JSON format
+        // Otherwise it's multipart format with files directly
+        $images = $this->input('images', []);
+        $isJsonFormat = ! empty($images) && is_array($images[0]) && ! ($images[0] instanceof \Illuminate\Http\UploadedFile);
+
+        if ($isJsonFormat) {
+            // JSON format: images[0]['file']
+            return [
+                'images' => 'required|array|min:1|max:50',
+                'images.*.file' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:10240',
+                'images.*.description' => 'nullable|string|max:5000',
+                'images.*.tags' => 'nullable|array',
+                'images.*.tags.*' => 'required|string|max:255',
+                'images.*.requested_tags' => 'nullable|array',
+                'images.*.requested_tags.*' => 'required|string|max:100',
+            ];
+        } else {
+            // Multipart format: images[0] (file directly)
+            return [
+                'images' => 'required|array|min:1|max:50',
+                'images.*' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:10240',
+                'images_data.*.description' => 'nullable|string|max:5000',
+                'images_data.*.tags' => 'nullable|array',
+                'images_data.*.tags.*' => 'required|string|max:255',
+                'images_data.*.requested_tags' => 'nullable|array',
+                'images_data.*.requested_tags.*' => 'required|string|max:100',
+            ];
+        }
     }
 
     /**
