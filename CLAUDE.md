@@ -663,7 +663,17 @@ php artisan test         # All tests must pass
 npm run build            # Ensure build works
 ```
 
-**4. Push Feature Branch (STOP HERE - Do Not Merge!)**
+**4. Ask for Approval Before Pushing**
+
+**CRITICAL: DO NOT push feature branches without explicit user approval.**
+
+Before pushing, inform the user:
+- All local quality checks have passed (Pint, tests, build)
+- Feature branch is ready to push
+- **Pushing will trigger automatic merge to `develop` and deployment to staging**
+- Ask: "Ready to push feature branch to trigger auto-merge and staging deployment?"
+
+Only proceed with push after user confirms:
 ```bash
 git push origin feature/feature-name
 ```
@@ -673,7 +683,7 @@ git push origin feature/feature-name
 - ❌ `git merge feature/feature-name`
 - ❌ `git push origin develop`
 
-**GitHub Actions will handle the merge automatically. Just push and wait.**
+**GitHub Actions will handle the merge automatically after tests pass.**
 
 **5. Automated Merge Process (Handled by GitHub Actions)**
 Once you push, GitHub Actions automatically:
@@ -741,11 +751,12 @@ git branch -d feature/feature-name  # Delete local branch
 - **NEVER manually merge feature branches to `develop`** - This is the most common mistake!
 - **NEVER push directly to `develop`** - Auto-merge handles this after tests pass
 - **NEVER run `git merge` commands** - GitHub Actions does the merging
+- **NEVER push feature branches without explicit user approval** - Pushing triggers auto-merge to staging
 
 **✅ ALWAYS DO THESE:**
 - **ALWAYS create a feature branch before starting ANY work** - Even for documentation
 - **ALWAYS branch from `develop`** - Never branch from another feature branch
-- **ALWAYS push feature branches and stop** - Let GitHub Actions handle the merge
+- **ALWAYS ask for user approval before pushing feature branches** - Explain it triggers auto-merge to staging
 - **ALWAYS run quality checks before pushing** - Pint, lint, tests, build locally first
 - **ALWAYS pull latest `develop` before creating feature branch** - Prevents merge conflicts
 - **ALWAYS check if behind before pushing** - Run `git fetch && git status` to check
