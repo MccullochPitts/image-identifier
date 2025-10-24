@@ -964,6 +964,189 @@ When writing tests, ensure they work in CI environments:
 - Ensure migrations run before tests in CI (check `.github/workflows/tests.yml`)
 
 
+=== test-organization rules ===
+
+## Test Organization & Selective Test Running
+
+### Test Groups
+This project uses test groups to organize tests by speed and external dependencies:
+
+- **`stripe`** - Tests that hit real Stripe API (slow, ~18 tests, ~15-18 minutes)
+- **`external`** - Tests that call other external APIs (reserved for future use)
+- **Fast tests** - Everything else (mocked external calls, ~2-3 minutes)
+
+### Running Tests Efficiently
+
+**Default behavior** (excludes slow tests):
+```bash
+php artisan test              # Excludes stripe+external by default (phpunit.xml config)
+vendor/bin/pint --dirty       # Only format changed files
+```
+
+**Include all tests** (for comprehensive validation):
+```bash
+php artisan test --group=stripe   # ONLY Stripe tests
+php artisan test --exclude-group=stripe  # Everything EXCEPT Stripe (default)
+```
+
+**Running specific tests**:
+```bash
+php artisan test --filter=ImageUpload        # Tests matching "ImageUpload"
+php artisan test tests/Feature/DashboardTest.php  # Single file
+```
+
+### Smart Test Selection Before Pushing
+
+**CRITICAL: You don't need to run ALL tests before every push.**
+
+Instead, run **relevant and semi-related** tests based on what you changed. This gives confidence without the 20-minute wait.
+
+#### Test Selection Matrix
+
+| Change Made | Tests to Run | Why |
+|-------------|--------------|-----|
+| **Subscription/Billing** | `--filter=Subscription --filter=PlanEligibility` | Direct: subscription logic<br>Related: plan limits |
+| **Image Upload** | `--filter=ImageUpload --filter=ProcessUploadedImage --filter=Dashboard` | Direct: upload logic<br>Related: image processing, dashboard display |
+| **Tag Generation** | `--filter=Tag --filter=ProcessUploadedImage` | Direct: tagging logic<br>Related: image processing triggers tags |
+| **API Endpoints** | `--filter=Api` | Direct: all API tests |
+| **Authentication** | `--filter=Auth --filter=Registration --filter=TwoFactor` | Direct: auth logic<br>Related: registration flow |
+| **User Settings** | `--filter=Settings --filter=Profile --filter=Password` | Direct: settings changes<br>Related: profile/password |
+| **Dashboard** | `--filter=Dashboard --filter=ImageUpload` | Direct: dashboard<br>Related: image display |
+| **Models/Services** | Tests for that specific model/service + any feature tests using it | Direct: changed code<br>Related: features using it |
+
+#### Examples of Smart Test Selection
+
+**Example 1: You modify image upload validation**
+```bash
+# Run these tests (3-5 minutes):
+php artisan test --filter=ImageUpload --filter=ProcessUploadedImage --exclude-group=stripe
+
+# Skip these (not directly related):
+# - Auth tests (login/register unchanged)
+# - Subscription tests (billing logic unchanged)
+# - Settings tests (user settings unchanged)
+```
+
+**Example 2: You add a new subscription plan**
+```bash
+# Run these tests (if you need Stripe):
+php artisan test --filter=Subscription --filter=PlanEligibility
+
+# Or mock Stripe for faster feedback (30 seconds):
+# Create mocked version of tests locally, then run:
+php artisan test --filter=Subscription --exclude-group=stripe
+```
+
+**Example 3: You modify the dashboard display**
+```bash
+# Run these tests (2-3 minutes):
+php artisan test --filter=Dashboard --exclude-group=stripe
+
+# Also consider (semi-related):
+php artisan test --filter=ImageUpload --exclude-group=stripe
+# (because dashboard shows uploaded images)
+```
+
+### Before Each Push: Minimum Test Requirements
+
+**Every feature branch push should run:**
+
+1. **Code style** (required, ~10 seconds):
+   ```bash
+   vendor/bin/pint --dirty
+   ```
+
+2. **Linting** (required, ~15 seconds):
+   ```bash
+   npm run lint
+   npm run format
+   ```
+
+3. **Relevant tests** (required, ~2-5 minutes):
+   ```bash
+   php artisan test --filter=<YourFeature> --exclude-group=stripe
+   ```
+
+4. **Build** (required, ~30 seconds):
+   ```bash
+   npm run build
+   ```
+
+**Total time before push: ~3-6 minutes** (vs 20 minutes for full suite)
+
+### When to Run Full Test Suite
+
+Run the complete test suite (including Stripe tests) in these cases:
+
+1. **Before merging to `develop`** - If you want maximum confidence locally
+2. **Before deploying to production** - Critical validation
+3. **After refactoring core services** - Ensure nothing broke
+4. **Weekly/periodic check** - General health check
+
+Run full suite:
+```bash
+# Remove default exclusions and run everything:
+php artisan test
+```
+
+### CI/CD Test Strategy
+
+**GitHub Actions automatically runs:**
+- ✅ Fast tests on every push (~2-3 minutes, excludes `stripe` group)
+- ✅ Code style checks (Pint)
+- ✅ Frontend linting (ESLint, Prettier)
+- ✅ Build validation
+
+**GitHub Actions does NOT run by default:**
+- ❌ Stripe tests (too slow for every push)
+- ❌ External API tests (reserved for future)
+
+**This means:**
+- You get fast CI feedback (3-5 minutes total)
+- Stripe tests run locally when working on payments
+- No more waiting 20 minutes between branches
+
+### Writing New Tests
+
+When writing new tests that hit external services:
+
+**Tag appropriately:**
+```php
+// Stripe tests
+uses(RefreshDatabase::class)->group('stripe');
+
+// Future external API tests
+uses(RefreshDatabase::class)->group('external');
+
+// Fast tests (no group needed - this is default)
+uses(RefreshDatabase::class);
+```
+
+**Mock external calls in CI:**
+```php
+// Good: Mocked for speed
+$mock = mock(GeminiProvider::class);
+$mock->shouldReceive('callWithImage')->andReturn([...]);
+
+// Avoid: Real API calls in every test
+$gemini = new GeminiProvider();
+$gemini->callWithImage($image);  // Slow!
+```
+
+### Summary: Test Running Philosophy
+
+1. **Before push**: Run relevant + semi-related tests (~3-6 minutes)
+2. **CI validates**: Fast tests + linting + build (~3-5 minutes)
+3. **Periodically**: Run full suite including Stripe tests (~20 minutes)
+4. **No waiting**: Move to next branch while CI runs in background
+
+This approach gives you:
+- ✅ Fast feedback loops
+- ✅ Confidence in your changes
+- ✅ No 20-minute waits between branches
+- ✅ Comprehensive testing when it matters
+
+
 === image-processing-api rules ===
 
 # Image Processing API - Laravel 12 Implementation

@@ -65,4 +65,4 @@ jobs:
           echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
 
       - name: Tests
-        run: ./vendor/bin/pest
+        run: ./vendor/bin/pest --exclude-group=stripe
