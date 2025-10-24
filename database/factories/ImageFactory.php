@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Image>
@@ -31,6 +32,41 @@ class ImageFactory extends Factory
             'parent_id' => null,
             'metadata' => null,
         ];
+    }
+
+    /**
+     * Configure the factory.
+     */
+    public function configure(): static
+    {
+        return $this->afterCreating(function (\App\Models\Image $image) {
+            // Create dummy image files when using fake storage (for tests)
+            $disk = Storage::disk(config('filesystems.default'));
+
+            // Check if storage is faked by trying to get the driver
+            try {
+                if ($disk->exists('__test_fake_check__') || ! $disk->exists($image->path)) {
+                    // Create a simple 1x1 PNG image (truecolor to avoid palette issues)
+                    $img = imagecreatetruecolor(1, 1);
+                    $white = imagecolorallocate($img, 255, 255, 255);
+                    imagefill($img, 0, 0, $white);
+                    ob_start();
+                    imagepng($img);
+                    $contents = ob_get_clean();
+                    imagedestroy($img);
+
+                    // Create main image file
+                    $disk->put($image->path, $contents);
+
+                    // Create thumbnail if path exists
+                    if ($image->thumbnail_path) {
+                        $disk->put($image->thumbnail_path, $contents);
+                    }
+                }
+            } catch (\Exception $e) {
+                // If checking storage fails, just skip file creation
+            }
+        });
     }
 
     /**

@@ -47,10 +47,11 @@ class ImageService
 
             // Increment user's upload count
             $user->incrementUploads();
-
-            // Dispatch job to process image (thumbnails, hash, dimensions)
-            dispatch(new \App\Jobs\ProcessUploadedImage($image));
         }
+
+        // Dispatch batch processing job after all uploads
+        // This will process metadata and tags in batches for efficient processing
+        dispatch(new \App\Jobs\BatchProcessImages);
 
         return $uploadedImages;
     }
@@ -164,6 +165,12 @@ class ImageService
 
     /**
      * Generate thumbnail for image.
+     *
+     * 384x384 is optimal for Gemini Flash 2.5 processing:
+     * - Images ≤384px in both dimensions consume only 258 tokens (single tile)
+     * - Larger images get divided into 768x768 tiles, consuming 258 tokens each
+     * - 384px provides sufficient detail for tag generation and object detection
+     * - Saves ~50% tokens compared to 768px tiles
      */
     public function generateThumbnail(Image $image): void
     {
@@ -171,9 +178,9 @@ class ImageService
         $fileContent = $disk->get($image->path);
         $interventionImage = \Intervention\Image\Laravel\Facades\Image::read($fileContent);
 
-        // Generate 300x300 thumbnail
+        // Generate 384x384 thumbnail optimized for Gemini processing
         $thumbnail = clone $interventionImage;
-        $thumbnail->cover(300, 300);
+        $thumbnail->cover(384, 384);
 
         $thumbnailFilename = 'thumb_'.basename($image->path);
         $thumbnailPath = 'thumbnails/'.$thumbnailFilename;

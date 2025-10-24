@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -22,6 +23,12 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
         ]);
+    })
+    ->withSchedule(function (Schedule $schedule) {
+        // Reset orphaned images stuck in processing status (safety net for failed jobs)
+        $schedule->command('images:process-orphaned --dispatch')
+            ->everyFifteenMinutes()
+            ->withoutOverlapping();
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //
