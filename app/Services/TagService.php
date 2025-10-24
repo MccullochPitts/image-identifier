@@ -104,10 +104,10 @@ class TagService
      */
     protected function attachTag(Image $image, string $key, string $value, float $confidence, string $source): void
     {
-        // Normalize before searching to match database storage
+        // Normalize using Tag model's static methods to ensure consistency
         $tag = Tag::firstOrCreate([
-            'key' => strtolower(trim($key)),
-            'value' => strtolower(trim($value)),
+            'key' => Tag::normalizeKey($key),
+            'value' => Tag::normalizeValue($value),
         ]);
 
         // Attach to image with pivot data (avoid duplicates)
