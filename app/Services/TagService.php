@@ -28,19 +28,7 @@ class TagService
             $values = is_array($value) ? $value : [$value];
 
             foreach ($values as $val) {
-                // Normalize before searching to match database storage
-                $tag = Tag::firstOrCreate([
-                    'key' => strtolower(trim($key)),
-                    'value' => strtolower(trim($val)),
-                ]);
-
-                // Attach to image with pivot data (avoid duplicates)
-                if (! $image->tags()->where('tag_id', $tag->id)->exists()) {
-                    $image->tags()->attach($tag->id, [
-                        'confidence' => 1.0,
-                        'source' => 'provided',
-                    ]);
-                }
+                $this->attachTag($image, $key, $val, 1.0, 'provided');
             }
         }
     }
@@ -102,24 +90,32 @@ class TagService
 
         // Store each tag with the image
         foreach ($generatedTags as $tagData) {
-            // Normalize before searching to match database storage
-            $tag = Tag::firstOrCreate([
-                'key' => strtolower(trim($tagData['key'])),
-                'value' => strtolower(trim($tagData['value'])),
-            ]);
-
             // Determine source: 'requested' if this was a requested key, otherwise 'generated'
             $source = ($requestedKeys !== null && in_array($tagData['key'], $requestedKeys)) ? 'requested' : 'generated';
 
-            // Attach to image with pivot data (avoid duplicates)
-            if (! $image->tags()->where('tag_id', $tag->id)->exists()) {
-                $image->tags()->attach($tag->id, [
-                    'confidence' => $tagData['confidence'],
-                    'source' => $source,
-                ]);
-            }
+            $this->attachTag($image, $tagData['key'], $tagData['value'], $tagData['confidence'], $source);
         }
 
         return $generatedTags;
+    }
+
+    /**
+     * Attach a single tag to an image with normalization and duplicate prevention.
+     */
+    protected function attachTag(Image $image, string $key, string $value, float $confidence, string $source): void
+    {
+        // Normalize before searching to match database storage
+        $tag = Tag::firstOrCreate([
+            'key' => strtolower(trim($key)),
+            'value' => strtolower(trim($value)),
+        ]);
+
+        // Attach to image with pivot data (avoid duplicates)
+        if (! $image->tags()->where('tag_id', $tag->id)->exists()) {
+            $image->tags()->attach($tag->id, [
+                'confidence' => $confidence,
+                'source' => $source,
+            ]);
+        }
     }
 }
