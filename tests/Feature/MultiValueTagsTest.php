@@ -29,12 +29,12 @@ test('user can provide array of values for a single tag key', function () {
     $tagService = app(TagService::class);
 
     $tagService->attachProvidedTags($image, [
-        'characters' => ['woody', 'buzz', 'rex'],
+        'character' => ['woody', 'buzz', 'rex'],
     ]);
 
     expect($image->tags()->count())->toBe(3);
 
-    $characterTags = $image->tags()->where('key', 'characters')->get();
+    $characterTags = $image->tags()->where('key', 'character')->get();
     expect($characterTags)->toHaveCount(3)
         ->and($characterTags->pluck('value')->toArray())->toContain('woody', 'buzz', 'rex');
 });
@@ -45,14 +45,14 @@ test('user can provide mixed single and array values', function () {
     $tagService = app(TagService::class);
 
     $tagService->attachProvidedTags($image, [
-        'characters' => ['woody', 'buzz'],
+        'character' => ['woody', 'buzz'],
         'format' => 'dvd',
         'genre' => 'animation',
     ]);
 
     expect($image->tags()->count())->toBe(4);
 
-    $characterTags = $image->tags()->where('key', 'characters')->get();
+    $characterTags = $image->tags()->where('key', 'character')->get();
     expect($characterTags)->toHaveCount(2);
 
     $formatTag = $image->tags()->where('key', 'format')->first();
@@ -65,10 +65,10 @@ test('array values are normalized to lowercase', function () {
     $tagService = app(TagService::class);
 
     $tagService->attachProvidedTags($image, [
-        'characters' => ['Woody', 'BUZZ', 'Rex'],
+        'character' => ['Woody', 'BUZZ', 'Rex'],
     ]);
 
-    $characterTags = $image->tags()->where('key', 'characters')->get();
+    $characterTags = $image->tags()->where('key', 'character')->get();
     expect($characterTags->pluck('value')->toArray())->toBe(['woody', 'buzz', 'rex']);
 });
 
@@ -79,12 +79,12 @@ test('duplicate values in array are not created twice', function () {
 
     // Provide same value twice in array
     $tagService->attachProvidedTags($image, [
-        'characters' => ['woody', 'Woody', 'WOODY'],
+        'character' => ['woody', 'Woody', 'WOODY'],
     ]);
 
     expect($image->tags()->count())->toBe(1);
 
-    $woodyTag = $image->tags()->where('key', 'characters')->first();
+    $woodyTag = $image->tags()->where('key', 'character')->first();
     expect($woodyTag->value)->toBe('woody');
 });
 
@@ -94,7 +94,7 @@ test('array values have correct pivot data', function () {
     $tagService = app(TagService::class);
 
     $tagService->attachProvidedTags($image, [
-        'characters' => ['woody', 'buzz'],
+        'character' => ['woody', 'buzz'],
     ]);
 
     $tags = $image->tags()->withPivot(['confidence', 'source'])->get();
@@ -111,7 +111,7 @@ test('empty array does not create tags', function () {
     $tagService = app(TagService::class);
 
     $tagService->attachProvidedTags($image, [
-        'characters' => [],
+        'character' => [],
         'format' => 'dvd',
     ]);
 
@@ -168,11 +168,11 @@ test('multiple images can share same multi-value tags', function () {
     $tagService = app(TagService::class);
 
     // Both images have woody and buzz
-    $tagService->attachProvidedTags($image1, ['characters' => ['woody', 'buzz']]);
-    $tagService->attachProvidedTags($image2, ['characters' => ['woody', 'buzz']]);
+    $tagService->attachProvidedTags($image1, ['character' => ['woody', 'buzz']]);
+    $tagService->attachProvidedTags($image2, ['character' => ['woody', 'buzz']]);
 
     // Should only create 2 unique tags total
-    expect(Tag::where('key', 'characters')->count())->toBe(2);
+    expect(Tag::where('key', 'character')->count())->toBe(2);
 
     // Both images should have 2 tags
     expect($image1->tags()->count())->toBe(2)
@@ -190,14 +190,14 @@ test('can add more values to existing multi-value tag', function () {
     $tagService = app(TagService::class);
 
     // First add woody and buzz
-    $tagService->attachProvidedTags($image, ['characters' => ['woody', 'buzz']]);
+    $tagService->attachProvidedTags($image, ['character' => ['woody', 'buzz']]);
     expect($image->tags()->count())->toBe(2);
 
     // Then add rex
-    $tagService->attachProvidedTags($image, ['characters' => ['rex']]);
+    $tagService->attachProvidedTags($image, ['character' => ['rex']]);
     expect($image->tags()->count())->toBe(3);
 
-    $characterTags = $image->tags()->where('key', 'characters')->get();
+    $characterTags = $image->tags()->where('key', 'character')->get();
     expect($characterTags->pluck('value')->toArray())->toContain('woody', 'buzz', 'rex');
 });
 
@@ -207,9 +207,9 @@ test('whitespace is trimmed from array values', function () {
     $tagService = app(TagService::class);
 
     $tagService->attachProvidedTags($image, [
-        'characters' => ['  woody  ', ' buzz', 'rex '],
+        'character' => ['  woody  ', ' buzz', 'rex '],
     ]);
 
-    $characterTags = $image->tags()->where('key', 'characters')->get();
+    $characterTags = $image->tags()->where('key', 'character')->get();
     expect($characterTags->pluck('value')->toArray())->toBe(['woody', 'buzz', 'rex']);
 });
