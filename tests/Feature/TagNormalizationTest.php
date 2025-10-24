@@ -3,6 +3,7 @@
 use App\Models\Image;
 use App\Models\Tag;
 use App\Models\User;
+use App\Services\TagService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -269,4 +270,22 @@ test('words ending in s but not plural remain unchanged', function () {
         // We're just documenting the behavior here
         expect($tag->key)->toBe($word);
     }
+});
+
+test('tag service normalizes plural keys before database lookup to prevent duplicates', function () {
+    $user = User::factory()->create();
+    $image = Image::factory()->create(['user_id' => $user->id]);
+    $tagService = app(TagService::class);
+
+    // Create a tag with singular form directly
+    Tag::create(['key' => 'character', 'value' => 'ham']);
+
+    // Try to attach a tag with plural form through the service
+    // This should NOT throw a unique constraint violation
+    $tagService->attachProvidedTags($image, ['characters' => 'ham']);
+
+    // Should only have one tag in database
+    expect(Tag::count())->toBe(1)
+        ->and(Tag::first()->key)->toBe('character')
+        ->and($image->tags()->count())->toBe(1);
 });
