@@ -10,7 +10,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 
-uses(RefreshDatabase::class);
+uses(RefreshDatabase::class)->group('stripe');
 
 beforeEach(function () {
     Storage::fake('public');
