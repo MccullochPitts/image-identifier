@@ -5,7 +5,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Spark\Spark;
 
-uses(RefreshDatabase::class);
+uses(RefreshDatabase::class)->group('stripe');
 
 beforeEach(function () {
     config(['cashier.key' => env('STRIPE_KEY')]);
