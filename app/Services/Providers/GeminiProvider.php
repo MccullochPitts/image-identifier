@@ -109,4 +109,105 @@ class GeminiProvider
 
         return $parsedResponse;
     }
+
+    /**
+     * Call Gemini API with multiple images in a single request.
+     * Returns an array of results keyed by image ID.
+     *
+     * @param  \Illuminate\Support\Collection<int, \App\Models\Image>  $images
+     * @param  array{system: string, user: string, schema: array}  $promptData
+     * @return array<int, array<string, mixed>>
+     *
+     * @throws \Exception
+     */
+    public function batchAnalyzeImages($images, array $promptData): array
+    {
+        $parts = [
+            [
+                'text' => $promptData['system']."\n\n".'Analyze each image and return results in the specified JSON format.',
+            ],
+        ];
+
+        $imageIdMapping = [];
+
+        // Add each image to the parts array
+        foreach ($images as $index => $image) {
+            $imagePath = storage_path('app/public/'.$image->path);
+
+            if (! file_exists($imagePath)) {
+                throw new \Exception("Image file not found: {$imagePath}");
+            }
+
+            $imageContent = file_get_contents($imagePath);
+            if ($imageContent === false) {
+                throw new \Exception("Failed to read image file: {$imagePath}");
+            }
+
+            $base64Image = base64_encode($imageContent);
+            $mimeType = mime_content_type($imagePath) ?: 'image/jpeg';
+
+            // Add image part
+            $parts[] = [
+                'inline_data' => [
+                    'mime_type' => $mimeType,
+                    'data' => $base64Image,
+                ],
+            ];
+
+            // Add label for this image
+            $parts[] = [
+                'text' => 'Image '.($index + 1).': '.$image->filename,
+            ];
+
+            $imageIdMapping[$index] = $image->id;
+        }
+
+        // Build Gemini API payload
+        $payload = [
+            'model' => 'gemini-2.0-flash-exp',
+            'contents' => [
+                [
+                    'parts' => $parts,
+                ],
+            ],
+            'generationConfig' => [
+                'response_mime_type' => 'application/json',
+                'response_schema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'results' => [
+                            'type' => 'array',
+                            'items' => $promptData['schema'],
+                        ],
+                    ],
+                    'required' => ['results'],
+                ],
+            ],
+        ];
+
+        $response = $this->call($payload);
+
+        // Extract the generated content
+        if (! isset($response['candidates'][0]['content']['parts'][0]['text'])) {
+            throw new \Exception('Unexpected Gemini API response format: '.json_encode($response));
+        }
+
+        $jsonText = $response['candidates'][0]['content']['parts'][0]['text'];
+
+        // Parse JSON response
+        $parsedResponse = json_decode($jsonText, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new \Exception('Failed to parse Gemini JSON response: '.json_last_error_msg());
+        }
+
+        // Map results back to image IDs
+        $results = [];
+        foreach ($parsedResponse['results'] as $index => $result) {
+            if (isset($imageIdMapping[$index])) {
+                $results[$imageIdMapping[$index]] = $result;
+            }
+        }
+
+        return $results;
+    }
 }

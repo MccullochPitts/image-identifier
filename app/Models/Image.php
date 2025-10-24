@@ -25,6 +25,7 @@ class Image extends Model
         'height',
         'hash',
         'processing_status',
+        'batch_id',
         'type',
         'parent_id',
         'metadata',

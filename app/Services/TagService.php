@@ -100,6 +100,51 @@ class TagService
     }
 
     /**
+     * Generate tags for multiple images in a single batch API call.
+     * This is more efficient than calling generateTags() individually.
+     *
+     * @param  \Illuminate\Support\Collection<int, Image>  $images
+     * @return array<int, \Illuminate\Support\Collection> Tags generated for each image, keyed by image ID
+     *
+     * @throws \Exception
+     */
+    public function generateTagsForBatch($images): array
+    {
+        if ($images->isEmpty()) {
+            return [];
+        }
+
+        // Build a generic prompt for batch processing
+        // We use the first image just to get the prompt structure
+        $promptData = $this->promptBuilder->buildPrompt($images->first(), null);
+
+        // Call batch analyze
+        $batchResults = $this->geminiProvider->batchAnalyzeImages($images, $promptData);
+
+        $tagsByImageId = [];
+
+        // Process results for each image
+        foreach ($batchResults as $imageId => $result) {
+            $image = $images->firstWhere('id', $imageId);
+
+            if (! $image) {
+                continue;
+            }
+
+            $generatedTags = collect($result['tags'] ?? []);
+
+            // Store each tag with the image
+            foreach ($generatedTags as $tagData) {
+                $this->attachTag($image, $tagData['key'], $tagData['value'], $tagData['confidence'], 'generated');
+            }
+
+            $tagsByImageId[$imageId] = $generatedTags;
+        }
+
+        return $tagsByImageId;
+    }
+
+    /**
      * Attach a single tag to an image with normalization and duplicate prevention.
      */
     protected function attachTag(Image $image, string $key, string $value, float $confidence, string $source): void
