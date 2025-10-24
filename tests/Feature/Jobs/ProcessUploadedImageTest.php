@@ -10,15 +10,30 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 
-uses(RefreshDatabase::class)->group('stripe');
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     Storage::fake('public');
+
+    // Create a user with a mocked active subscription
+    // This avoids hitting the real Stripe API in every test
+    $this->user = User::factory()->create();
+
+    // Create a fake subscription record without calling Stripe
+    $this->user->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_test_'.uniqid(),
+        'stripe_status' => 'active',
+        'stripe_price' => config('spark.billables.user.plans.0.monthly_id'),
+        'quantity' => 1,
+        'trial_ends_at' => null,
+        'ends_at' => null,
+    ]);
 });
 
 test('job extracts image dimensions', function () {
-    $user = User::factory()->create();
-    $user->newSubscription('default', config('spark.billables.user.plans.0.monthly_id'))->create('pm_card_visa');
+    // Use the mocked user from beforeEach
+    $user = $this->user;
 
     // Create a test image file
     $testImage = UploadedFile::fake()->image('test.jpg', 800, 600);
@@ -50,8 +65,8 @@ test('job extracts image dimensions', function () {
 });
 
 test('job generates thumbnail', function () {
-    $user = User::factory()->create();
-    $user->newSubscription('default', config('spark.billables.user.plans.0.monthly_id'))->create('pm_card_visa');
+    // Use the mocked user from beforeEach
+    $user = $this->user;
 
     $testImage = UploadedFile::fake()->image('test.jpg', 800, 600);
     $path = 'images/test-'.uniqid().'.jpg';
@@ -77,8 +92,8 @@ test('job generates thumbnail', function () {
 });
 
 test('job calculates file hash for duplicate detection', function () {
-    $user = User::factory()->create();
-    $user->newSubscription('default', config('spark.billables.user.plans.0.monthly_id'))->create('pm_card_visa');
+    // Use the mocked user from beforeEach
+    $user = $this->user;
 
     $testImage = UploadedFile::fake()->image('test.jpg', 800, 600);
     $path = 'images/test-'.uniqid().'.jpg';
@@ -104,8 +119,8 @@ test('job calculates file hash for duplicate detection', function () {
 });
 
 test('job updates processing status to completed', function () {
-    $user = User::factory()->create();
-    $user->newSubscription('default', config('spark.billables.user.plans.0.monthly_id'))->create('pm_card_visa');
+    // Use the mocked user from beforeEach
+    $user = $this->user;
 
     $testImage = UploadedFile::fake()->image('test.jpg', 800, 600);
     $path = 'images/test-'.uniqid().'.jpg';
@@ -132,8 +147,8 @@ test('job updates processing status to completed', function () {
 });
 
 test('job marks status as failed when image file is missing', function () {
-    $user = User::factory()->create();
-    $user->newSubscription('default', config('spark.billables.user.plans.0.monthly_id'))->create('pm_card_visa');
+    // Use the mocked user from beforeEach
+    $user = $this->user;
 
     $image = Image::create([
         'user_id' => $user->id,
@@ -174,8 +189,8 @@ test('job is dispatchable', function () {
 });
 
 test('job processes different image sizes correctly', function ($width, $height) {
-    $user = User::factory()->create();
-    $user->newSubscription('default', config('spark.billables.user.plans.0.monthly_id'))->create('pm_card_visa');
+    // Use the mocked user from beforeEach
+    $user = $this->user;
 
     $testImage = UploadedFile::fake()->image('test.jpg', $width, $height);
     $path = 'images/test-'.uniqid().'.jpg';
