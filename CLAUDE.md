@@ -398,6 +398,7 @@ php artisan tinker --execute="User::first()->subscription()"
 - To run all tests: `php artisan test`.
 - To run all tests in a file: `php artisan test tests/Feature/ExampleTest.php`.
 - To filter on a particular test name: `php artisan test --filter=testName` (recommended after making a change to a related file).
+- **Exclude Stripe tests unless working on payments**: Stripe tests take significantly longer to run. Use `php artisan test --exclude-group=stripe` for faster test runs. ONLY run Stripe tests when working on payment/subscription features.
 - When the tests relating to your changes are passing, ask the user if they would like to run the entire test suite to ensure everything is still passing.
 - **CRITICAL: Run tests in the background to save context tokens** - Always use `run_in_background: true` parameter when running tests via Bash tool. This prevents test output from consuming large amounts of context. Check results with `BashOutput` tool using `filter` parameter to show only "PASS" or "FAIL" lines. Example: `BashOutput(bash_id: "abc123", filter: "PASS|FAIL|Tests:")`
 
