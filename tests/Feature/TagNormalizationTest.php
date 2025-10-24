@@ -117,3 +117,156 @@ test('updating tag key and value normalizes them', function () {
     expect($tag->fresh()->key)->toBe('updated')
         ->and($tag->fresh()->value)->toBe('new value');
 });
+
+test('tag keys are singularized on creation', function () {
+    $tag = Tag::create([
+        'key' => 'pokemon cards',
+        'value' => 'charizard',
+    ]);
+
+    expect($tag->key)->toBe('pokemon card');
+});
+
+test('only last word in tag key is singularized', function () {
+    $tests = [
+        'sports cars' => 'sports car',
+        'trading cards' => 'trading card',
+        'operations managers' => 'operations manager',
+        'savings accounts' => 'savings account',
+        'communications towers' => 'communications tower',
+    ];
+
+    foreach ($tests as $input => $expected) {
+        $tag = Tag::create([
+            'key' => $input,
+            'value' => 'test',
+        ]);
+
+        expect($tag->key)->toBe($expected, "Failed: '{$input}' should become '{$expected}'");
+    }
+});
+
+test('irregular plurals are handled correctly', function () {
+    $tests = [
+        'children' => 'child',
+        'people' => 'person',
+        'knives' => 'knife',
+        'wolves' => 'wolf',
+        'feet' => 'foot',
+        'teeth' => 'tooth',
+        'mice' => 'mouse',
+        'geese' => 'goose',
+    ];
+
+    foreach ($tests as $plural => $singular) {
+        $tag = Tag::create([
+            'key' => $plural,
+            'value' => 'test',
+        ]);
+
+        expect($tag->key)->toBe($singular, "Failed: '{$plural}' should become '{$singular}'");
+    }
+});
+
+test('plural exception words remain unchanged', function () {
+    $exceptions = [
+        'jeans',
+        'scissors',
+        'glasses',
+        'pants',
+        'shorts',
+        'binoculars',
+        'pliers',
+    ];
+
+    foreach ($exceptions as $exception) {
+        $tag = Tag::create([
+            'key' => $exception,
+            'value' => 'test',
+        ]);
+
+        expect($tag->key)->toBe($exception, "Failed: '{$exception}' should remain unchanged");
+    }
+});
+
+test('single word tags are singularized', function () {
+    $tests = [
+        'cars' => 'car',
+        'books' => 'book',
+        'characters' => 'character',
+        'movies' => 'movie',
+    ];
+
+    foreach ($tests as $plural => $singular) {
+        $tag = Tag::create([
+            'key' => $plural,
+            'value' => 'test',
+        ]);
+
+        expect($tag->key)->toBe($singular);
+    }
+});
+
+test('already singular tags remain unchanged', function () {
+    $singulars = [
+        'car',
+        'book',
+        'character',
+        'pokemon card',
+        'trading card',
+    ];
+
+    foreach ($singulars as $singular) {
+        $tag = Tag::create([
+            'key' => $singular,
+            'value' => 'test',
+        ]);
+
+        expect($tag->key)->toBe($singular);
+    }
+});
+
+test('singularization works with uppercase input', function () {
+    $tag = Tag::create([
+        'key' => 'Pokemon Cards',
+        'value' => 'test',
+    ]);
+
+    expect($tag->key)->toBe('pokemon card');
+});
+
+test('singularization prevents duplicate tags', function () {
+    // Create tag with plural form
+    Tag::create([
+        'key' => 'trading cards',
+        'value' => 'pokemon',
+    ]);
+
+    // Try to create same tag with singular form
+    $tag2 = Tag::firstOrCreate([
+        'key' => 'trading card',
+        'value' => 'pokemon',
+    ]);
+
+    expect(Tag::count())->toBe(1)
+        ->and($tag2->key)->toBe('trading card');
+});
+
+test('words ending in s but not plural remain unchanged', function () {
+    $nonPlurals = [
+        'glass',
+        'bass',
+        'grass',
+    ];
+
+    foreach ($nonPlurals as $word) {
+        $tag = Tag::create([
+            'key' => $word,
+            'value' => 'test',
+        ]);
+
+        // Note: inflector will singularize these, which is expected behavior
+        // We're just documenting the behavior here
+        expect($tag->key)->toBe($word);
+    }
+});
