@@ -56,7 +56,15 @@ class PromptBuilder
         }
 
         $prompt .= "\n\nFor each tag, provide a confidence score between 0 and 1 indicating how certain you are about the value.";
-        $prompt .= "\n\nIMPORTANT: If you identify multiple items in a category (e.g., multiple characters, actors, or objects), return separate tag objects with the same key but different values. For example, if you see Woody and Buzz in an image, return: [{\"key\": \"character\", \"value\": \"woody\", \"confidence\": 0.95}, {\"key\": \"character\", \"value\": \"buzz\", \"confidence\": 0.9}]";
+
+        // CRITICAL instruction to prevent comma-separated lists
+        $prompt .= "\n\n⚠️ CRITICAL RULE: NEVER use comma-separated lists in tag values. Each distinct item MUST be a separate tag object.";
+        $prompt .= "\n\n✅ CORRECT - If you see Woody and Buzz:";
+        $prompt .= "\n[{\"key\": \"character\", \"value\": \"woody\", \"confidence\": 0.95}, {\"key\": \"character\", \"value\": \"buzz\", \"confidence\": 0.9}]";
+        $prompt .= "\n\n❌ INCORRECT - DO NOT DO THIS:";
+        $prompt .= "\n[{\"key\": \"character\", \"value\": \"woody, buzz\", \"confidence\": 0.95}]";
+        $prompt .= "\n[{\"key\": \"character\", \"value\": \"woody and buzz\", \"confidence\": 0.95}]";
+        $prompt .= "\n\nThis applies to ALL multi-value situations: multiple characters, actors, colors, objects, locations, etc. Always create separate tag entries with the same key.";
 
         return $prompt;
     }
