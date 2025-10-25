@@ -17,12 +17,24 @@ class ImageService
      *
      * @param  array{images: array<array{file: UploadedFile, description?: string, tags?: array<string, string>, requested_tags?: array<string>}>}  $data
      * @return array<Image>
+     *
+     * @throws \Exception
      */
     public function uploadImages(array $data, User $user): array
     {
+        // Check if user has upload capacity
+        if (! $user->canUpload()) {
+            throw new \Exception('Upload limit reached. Please upgrade your plan or wait for your limit to reset.');
+        }
+
         $uploadedImages = [];
 
         foreach ($data['images'] as $imageData) {
+            // Check if user still has capacity for this specific upload
+            if (! $user->fresh()->canUpload()) {
+                throw new \Exception('Upload limit reached after uploading '.count($uploadedImages).' images.');
+            }
+
             // Upload file and create image record
             $image = $this->uploadSingleImage($imageData['file'], $user);
 
@@ -57,7 +69,32 @@ class ImageService
     }
 
     /**
+     * Resize image to fit within max dimension while maintaining aspect ratio.
+     * Generic utility that can be reused for any resizing needs.
+     * Returns the same image instance (mutates in place).
+     */
+    protected function resizeToMaxDimension($interventionImage, int $maxDimension)
+    {
+        if ($interventionImage->width() > $maxDimension || $interventionImage->height() > $maxDimension) {
+            $interventionImage->scale(width: $maxDimension, height: $maxDimension);
+        }
+
+        return $interventionImage;
+    }
+
+    /**
+     * Resize image according to user's subscription plan.
+     * Convenience method that combines plan lookup and resizing.
+     * Returns the same image instance (mutates in place).
+     */
+    protected function resizeForUserPlan($interventionImage, User $user)
+    {
+        return $this->resizeToMaxDimension($interventionImage, $user->maxImageDimension());
+    }
+
+    /**
      * Upload a single image.
+     * Resizes based on user's subscription plan before storage.
      */
     protected function uploadSingleImage(UploadedFile $file, User $user): Image
     {
@@ -65,8 +102,12 @@ class ImageService
         $filename = Str::uuid().'.'.$file->getClientOriginalExtension();
         $path = 'images/'.$filename;
 
-        // Store file (uses public disk locally, S3 in production)
-        Storage::disk(config('filesystems.default'))->put($path, file_get_contents($file->getRealPath()));
+        // Load and resize image based on user's plan
+        $interventionImage = \Intervention\Image\Laravel\Facades\Image::read($file->getRealPath());
+        $this->resizeForUserPlan($interventionImage, $user);
+
+        // Store resized image (uses public disk locally, S3 in production)
+        Storage::disk(config('filesystems.default'))->put($path, (string) $interventionImage->encode());
 
         // Create image record with pending status
         return Image::create([
@@ -74,7 +115,7 @@ class ImageService
             'filename' => $file->getClientOriginalName(),
             'path' => $path,
             'mime_type' => $file->getMimeType(),
-            'size' => $file->getSize(),
+            'size' => strlen((string) $interventionImage->encode()),
             'processing_status' => 'pending',
             'type' => 'original',
         ]);
@@ -164,13 +205,10 @@ class ImageService
     }
 
     /**
-     * Generate thumbnail for image.
+     * Generate thumbnail for UI display.
      *
-     * 384x384 is optimal for Gemini Flash 2.5 processing:
-     * - Images ≤384px in both dimensions consume only 258 tokens (single tile)
-     * - Larger images get divided into 768x768 tiles, consuming 258 tokens each
-     * - 384px provides sufficient detail for tag generation and object detection
-     * - Saves ~50% tokens compared to 768px tiles
+     * 150x150 is a standard thumbnail size for galleries and lists.
+     * The stored image is already resized according to plan at upload time.
      */
     public function generateThumbnail(Image $image): void
     {
@@ -178,9 +216,9 @@ class ImageService
         $fileContent = $disk->get($image->path);
         $interventionImage = \Intervention\Image\Laravel\Facades\Image::read($fileContent);
 
-        // Generate 384x384 thumbnail optimized for Gemini processing
+        // Generate 150x150 thumbnail for UI display
         $thumbnail = clone $interventionImage;
-        $thumbnail->cover(384, 384);
+        $thumbnail->cover(150, 150);
 
         $thumbnailFilename = 'thumb_'.basename($image->path);
         $thumbnailPath = 'thumbnails/'.$thumbnailFilename;
@@ -200,5 +238,32 @@ class ImageService
         $hash = hash('sha256', $fileContent);
 
         $image->update(['hash' => $hash]);
+    }
+
+    /**
+     * Copy stored image to a temporary file for external API processing.
+     * The stored image is already resized according to the user's plan.
+     * Returns a temporary file path that should be deleted after use.
+     *
+     * @return string Temporary file path (caller must unlink after use)
+     */
+    public function copyImageToTemp(Image $image): string
+    {
+        $disk = Storage::disk(config('filesystems.default'));
+        $fileContent = $disk->get($image->path);
+
+        // Create temporary file
+        $tempPath = tempnam(sys_get_temp_dir(), 'img_');
+        file_put_contents($tempPath, $fileContent);
+
+        return $tempPath;
+    }
+
+    /**
+     * @deprecated Use copyImageToTemp() instead. This method is kept for backward compatibility.
+     */
+    public function prepareImageForAi(Image $image): string
+    {
+        return $this->copyImageToTemp($image);
     }
 }

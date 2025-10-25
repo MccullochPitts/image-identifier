@@ -110,6 +110,45 @@ class User extends Authenticatable
     }
 
     /**
+     * Check if user is on a premium plan (Startup or Enterprise).
+     * Premium plans get full-resolution AI processing.
+     * Standard plan gets cost-optimized 768px processing.
+     */
+    public function hasPremiumPlan(): bool
+    {
+        if (! $this->subscribed()) {
+            return false;
+        }
+
+        // Get the user's current plan price ID
+        $currentPriceId = $this->subscription()->stripe_price;
+
+        // Get premium plan IDs from Spark config (Startup and Enterprise)
+        $plans = config('spark.billables.user.plans', []);
+        $premiumPlanIds = [];
+
+        foreach ($plans as $plan) {
+            // Premium plans are Startup and Enterprise (not Standard)
+            if (in_array($plan['name'], ['Startup', 'Enterprise'])) {
+                $premiumPlanIds[] = $plan['monthly_id'];
+                $premiumPlanIds[] = $plan['yearly_id'];
+            }
+        }
+
+        return in_array($currentPriceId, $premiumPlanIds);
+    }
+
+    /**
+     * Get maximum allowed image dimension based on user's subscription plan.
+     * - Standard plan: 768px (cost-optimized for AI processing)
+     * - Startup/Enterprise plans: 2048px (full resolution)
+     */
+    public function maxImageDimension(): int
+    {
+        return $this->hasPremiumPlan() ? 2048 : 768;
+    }
+
+    /**
      * Get all images belonging to this user.
      */
     public function images(): HasMany
