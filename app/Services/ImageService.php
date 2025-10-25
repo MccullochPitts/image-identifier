@@ -266,4 +266,35 @@ class ImageService
     {
         return $this->copyImageToTemp($image);
     }
+
+    /**
+     * Prepare multiple images for batch AI processing.
+     * Creates temp files for all images and returns paths with cleanup function.
+     * Calls prepareImageForAi() for each image to ensure consistency with single-image preparation.
+     *
+     * @param  \Illuminate\Support\Collection<Image>  $images
+     * @return array{paths: array<int, string>, mapping: array<int, int>, cleanup: callable}
+     */
+    public function prepareImagesForBatchAi($images): array
+    {
+        $tempPaths = [];
+        $imageIdMapping = [];
+
+        foreach ($images as $index => $image) {
+            $tempPaths[$index] = $this->prepareImageForAi($image);
+            $imageIdMapping[$index] = $image->id;
+        }
+
+        return [
+            'paths' => $tempPaths,
+            'mapping' => $imageIdMapping,
+            'cleanup' => function () use ($tempPaths) {
+                foreach ($tempPaths as $path) {
+                    if (file_exists($path)) {
+                        unlink($path);
+                    }
+                }
+            },
+        ];
+    }
 }

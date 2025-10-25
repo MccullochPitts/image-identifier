@@ -124,18 +124,17 @@ class GeminiProvider
 
     /**
      * Call Gemini API with multiple images in a single request.
-     * Returns an array of results keyed by image ID, plus usage metadata.
+     * Pure API wrapper - accepts file paths and returns parsed response.
+     * Does not handle Storage, Image models, or temp file creation.
      *
-     * Handles both local and cloud storage by using Storage::disk(config('filesystems.default')).
-     * Creates temp files for Gemini API (which requires file paths) and cleans them up afterward.
-     *
-     * @param  \Illuminate\Support\Collection  $images  Collection of Image models
+     * @param  array<int, string>  $imagePaths  Array of temp file paths indexed by position
+     * @param  array<int, int>  $imageIdMapping  Maps position index to image ID
      * @param  array{system: string, user: string, schema: array}  $promptData
      * @return array{data: array<int, array>, usage: array}
      *
      * @throws \Exception
      */
-    public function batchAnalyzeImages($images, array $promptData): array
+    public function batchAnalyzeImages(array $imagePaths, array $imageIdMapping, array $promptData): array
     {
         $parts = [
             [
@@ -143,110 +142,88 @@ class GeminiProvider
             ],
         ];
 
-        $tempFiles = [];
-        $imageIdMapping = [];
-        $disk = \Illuminate\Support\Facades\Storage::disk(config('filesystems.default'));
-
-        try {
-            // Create temp files for each image using Storage facade (works with S3 and local)
-            foreach ($images as $index => $image) {
-                if (! $disk->exists($image->path)) {
-                    throw new \Exception("Image file not found in storage: {$image->path}");
-                }
-
-                // Get file content from Storage disk (works with both S3 and local)
-                $fileContent = $disk->get($image->path);
-
-                // Create temporary file for Gemini API (Gemini requires file path, not content)
-                $tempPath = tempnam(sys_get_temp_dir(), 'img_');
-                file_put_contents($tempPath, $fileContent);
-                $tempFiles[] = $tempPath;
-
-                $base64Image = base64_encode($fileContent);
-                $mimeType = mime_content_type($tempPath) ?: 'image/jpeg';
-
-                // Add image part
-                $parts[] = [
-                    'inline_data' => [
-                        'mime_type' => $mimeType,
-                        'data' => $base64Image,
-                    ],
-                ];
-
-                // Add label for this image
-                $parts[] = [
-                    'text' => 'Image '.($index + 1),
-                ];
-
-                $imageIdMapping[$index] = $image->id;
+        // Build API payload with provided file paths
+        foreach ($imagePaths as $index => $tempPath) {
+            $fileContent = file_get_contents($tempPath);
+            if ($fileContent === false) {
+                throw new \Exception("Failed to read image file: {$tempPath}");
             }
 
-            // Build Gemini API payload
-            $payload = [
-                'model' => 'gemini-2.0-flash-exp',
-                'contents' => [
-                    [
-                        'parts' => $parts,
-                    ],
+            $base64Image = base64_encode($fileContent);
+            $mimeType = mime_content_type($tempPath) ?: 'image/jpeg';
+
+            // Add image part
+            $parts[] = [
+                'inline_data' => [
+                    'mime_type' => $mimeType,
+                    'data' => $base64Image,
                 ],
-                'generationConfig' => [
-                    'response_mime_type' => 'application/json',
-                    'response_schema' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'results' => [
-                                'type' => 'array',
-                                'items' => $promptData['schema'],
-                            ],
+            ];
+
+            // Add label for this image
+            $parts[] = [
+                'text' => 'Image '.($index + 1),
+            ];
+        }
+
+        // Build Gemini API payload
+        $payload = [
+            'model' => 'gemini-2.0-flash-exp',
+            'contents' => [
+                [
+                    'parts' => $parts,
+                ],
+            ],
+            'generationConfig' => [
+                'response_mime_type' => 'application/json',
+                'response_schema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'results' => [
+                            'type' => 'array',
+                            'items' => $promptData['schema'],
                         ],
-                        'required' => ['results'],
                     ],
+                    'required' => ['results'],
                 ],
-            ];
+            ],
+        ];
 
-            $response = $this->call($payload);
+        $response = $this->call($payload);
 
-            // Extract the generated content
-            if (! isset($response['candidates'][0]['content']['parts'][0]['text'])) {
-                throw new \Exception('Unexpected Gemini API response format: '.json_encode($response));
-            }
+        // Extract the generated content
+        if (! isset($response['candidates'][0]['content']['parts'][0]['text'])) {
+            throw new \Exception('Unexpected Gemini API response format: '.json_encode($response));
+        }
 
-            $jsonText = $response['candidates'][0]['content']['parts'][0]['text'];
+        $jsonText = $response['candidates'][0]['content']['parts'][0]['text'];
 
-            // Parse JSON response
-            $parsedResponse = json_decode($jsonText, true);
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                throw new \Exception('Failed to parse Gemini JSON response: '.json_last_error_msg());
-            }
+        // Parse JSON response
+        $parsedResponse = json_decode($jsonText, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new \Exception('Failed to parse Gemini JSON response: '.json_last_error_msg());
+        }
 
-            // Map results back to image IDs
-            $results = [];
-            foreach ($parsedResponse['results'] as $index => $result) {
-                if (isset($imageIdMapping[$index])) {
-                    $results[$imageIdMapping[$index]] = $result;
-                }
-            }
-
-            // Extract usage metadata
-            $usageMetadata = $response['usageMetadata'] ?? [];
-
-            return [
-                'data' => $results,
-                'usage' => [
-                    'model' => 'gemini-2.0-flash-exp',
-                    'prompt_tokens' => $usageMetadata['promptTokenCount'] ?? 0,
-                    'completion_tokens' => $usageMetadata['candidatesTokenCount'] ?? 0,
-                    'total_tokens' => $usageMetadata['totalTokenCount'] ?? 0,
-                    'cached_tokens' => $usageMetadata['cachedContentTokenCount'] ?? null,
-                ],
-            ];
-        } finally {
-            // Clean up temp files
-            foreach ($tempFiles as $tempFile) {
-                if (file_exists($tempFile)) {
-                    unlink($tempFile);
-                }
+        // Map results back to image IDs
+        $results = [];
+        foreach ($parsedResponse['results'] as $index => $result) {
+            if (isset($imageIdMapping[$index])) {
+                $results[$imageIdMapping[$index]] = $result;
             }
         }
+
+        // Extract usage metadata
+        $usageMetadata = $response['usageMetadata'] ?? [];
+
+        return [
+            'data' => $results,
+            'usage' => [
+                'model' => 'gemini-2.0-flash-exp',
+                'prompt_tokens' => $usageMetadata['promptTokenCount'] ?? 0,
+                'completion_tokens' => $usageMetadata['candidatesTokenCount'] ?? 0,
+                'total_tokens' => $usageMetadata['totalTokenCount'] ?? 0,
+                'cached_tokens' => $usageMetadata['cachedContentTokenCount'] ?? null,
+            ],
+        ];
     }
 }

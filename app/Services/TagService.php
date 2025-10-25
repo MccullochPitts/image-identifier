@@ -103,8 +103,8 @@ class TagService
      * Generate tags for multiple images in a single batch API call.
      * This is more efficient than calling generateTags() individually.
      *
-     * GeminiProvider handles temp file creation/cleanup internally using Storage::disk(config('filesystems.default')),
-     * which works with both local (public) and cloud (S3/R2) storage.
+     * Orchestrates the flow: prepare images → call API → cleanup → store tags.
+     * ImageService handles file preparation, GeminiProvider handles API calls.
      *
      * @param  \Illuminate\Support\Collection<int, Image>  $images
      * @return array<int, \Illuminate\Support\Collection> Tags generated for each image, keyed by image ID
@@ -121,36 +121,49 @@ class TagService
         // We use the first image just to get the prompt structure
         $promptData = $this->promptBuilder->buildPrompt($images->first(), null);
 
-        // Call batch analyze - GeminiProvider handles Storage facade and temp file management
-        $response = $this->geminiProvider->batchAnalyzeImages($images, $promptData);
+        // Prepare images for AI processing (creates temp files)
+        $imageService = app(ImageService::class);
+        $prepared = $imageService->prepareImagesForBatchAi($images);
 
-        // Log AI request
-        $this->logAiRequest('batch_generate_tags', $response['usage'], [
-            'image_ids' => $images->pluck('id')->toArray(),
-            'batch_size' => $images->count(),
-        ]);
+        try {
+            // Call Gemini API with prepared file paths
+            $response = $this->geminiProvider->batchAnalyzeImages(
+                $prepared['paths'],
+                $prepared['mapping'],
+                $promptData
+            );
 
-        $tagsByImageId = [];
+            // Log AI request
+            $this->logAiRequest('batch_generate_tags', $response['usage'], [
+                'image_ids' => $images->pluck('id')->toArray(),
+                'batch_size' => $images->count(),
+            ]);
 
-        // Process results for each image
-        foreach ($response['data'] as $imageId => $result) {
-            $image = $images->firstWhere('id', $imageId);
+            $tagsByImageId = [];
 
-            if (! $image) {
-                continue;
+            // Process results for each image
+            foreach ($response['data'] as $imageId => $result) {
+                $image = $images->firstWhere('id', $imageId);
+
+                if (! $image) {
+                    continue;
+                }
+
+                $generatedTags = collect($result['tags'] ?? []);
+
+                // Store each tag with the image
+                foreach ($generatedTags as $tagData) {
+                    $this->attachTag($image, $tagData['key'], $tagData['value'], $tagData['confidence'], 'generated');
+                }
+
+                $tagsByImageId[$imageId] = $generatedTags;
             }
 
-            $generatedTags = collect($result['tags'] ?? []);
-
-            // Store each tag with the image
-            foreach ($generatedTags as $tagData) {
-                $this->attachTag($image, $tagData['key'], $tagData['value'], $tagData['confidence'], 'generated');
-            }
-
-            $tagsByImageId[$imageId] = $generatedTags;
+            return $tagsByImageId;
+        } finally {
+            // Clean up temp files
+            $prepared['cleanup']();
         }
-
-        return $tagsByImageId;
     }
 
     /**

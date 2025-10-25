@@ -55,20 +55,34 @@ beforeEach(function () {
     });
 
     // Mock prepareImageForAi to return temp file paths
+    // We don't need real files since GeminiProvider is also mocked
     $this->imageServiceMock->shouldReceive('prepareImageForAi')->zeroOrMoreTimes()->andReturnUsing(function ($image) {
-        // Create a dummy temp file
-        $tempPath = tempnam(sys_get_temp_dir(), 'test_img_');
-        // Create a simple 1x1 PNG image
-        $img = imagecreatetruecolor(1, 1);
-        $color = imagecolorallocate($img, 255, 255, 255);
-        imagefill($img, 0, 0, $color);
-        ob_start();
-        imagepng($img);
-        $contents = ob_get_clean();
-        imagedestroy($img);
-        file_put_contents($tempPath, $contents);
+        // Return a fake path - no actual file needed since we mock GeminiProvider
+        return '/tmp/fake_test_img_'.$image->id.'.jpg';
+    });
 
-        return $tempPath;
+    // Mock prepareImagesForBatchAi to return array of paths with cleanup function
+    // We don't need real files since GeminiProvider is also mocked
+    $this->imageServiceMock->shouldReceive('prepareImagesForBatchAi')->zeroOrMoreTimes()->andReturnUsing(function ($images) {
+        $tempPaths = [];
+        $imageIdMapping = [];
+
+        foreach ($images as $index => $image) {
+            // Return fake paths - no actual files needed since we mock GeminiProvider
+            $tempPaths[$index] = '/tmp/fake_batch_img_'.$image->id.'.jpg';
+            $imageIdMapping[$index] = $image->id;
+        }
+
+        // No-op cleanup since we don't create real files
+        $cleanup = function () {
+            // Nothing to clean up
+        };
+
+        return [
+            'paths' => $tempPaths,
+            'mapping' => $imageIdMapping,
+            'cleanup' => $cleanup,
+        ];
     });
 
     // Mock GeminiProvider for all tests
@@ -91,13 +105,13 @@ beforeEach(function () {
         ];
     };
 
-    // Helper for batch analyze mocks with new signature (images, promptData)
-    // GeminiProvider now handles Storage facade and temp file creation internally
+    // Helper for batch analyze mocks with new signature (imagePaths, imageIdMapping, promptData)
+    // GeminiProvider is now a pure API wrapper accepting file paths
     $this->mockBatchSuccess = function ($imageIds) {
-        return function ($images, $promptData) {
+        return function ($imagePaths, $imageIdMapping, $promptData) {
             $results = [];
-            foreach ($images as $image) {
-                $results[$image->id] = ['tags' => [['key' => 'test', 'value' => 'batch', 'confidence' => 0.9]]];
+            foreach ($imageIdMapping as $index => $imageId) {
+                $results[$imageId] = ['tags' => [['key' => 'test', 'value' => 'batch', 'confidence' => 0.9]]];
             }
 
             return ($this->wrapWithUsage)($results);
@@ -528,13 +542,13 @@ test('does not pick up failed images in subsequent batches', function () {
     // Mock Gemini - should only be called with 1 image
     $this->geminiMock->shouldReceive('batchAnalyzeImages')
         ->once()
-        ->andReturnUsing(function ($images, $promptData) {
+        ->andReturnUsing(function ($imagePaths, $imageIdMapping, $promptData) {
             // Verify only 1 image was sent
-            expect(count($images))->toBe(1);
+            expect(count($imagePaths))->toBe(1);
 
             $results = [];
-            foreach ($images as $image) {
-                $results[$image->id] = ['tags' => [['key' => 'test', 'value' => 'batch', 'confidence' => 0.9]]];
+            foreach ($imageIdMapping as $index => $imageId) {
+                $results[$imageId] = ['tags' => [['key' => 'test', 'value' => 'batch', 'confidence' => 0.9]]];
             }
 
             return ($this->wrapWithUsage)($results);
@@ -569,13 +583,13 @@ test('does not pick up processing images from other active batches', function ()
     // Mock Gemini - should only be called with 1 image
     $this->geminiMock->shouldReceive('batchAnalyzeImages')
         ->once()
-        ->andReturnUsing(function ($images, $promptData) {
+        ->andReturnUsing(function ($imagePaths, $imageIdMapping, $promptData) {
             // Verify only 1 image was sent (not the processing one)
-            expect(count($images))->toBe(1);
+            expect(count($imagePaths))->toBe(1);
 
             $results = [];
-            foreach ($images as $image) {
-                $results[$image->id] = ['tags' => [['key' => 'test', 'value' => 'batch', 'confidence' => 0.9]]];
+            foreach ($imageIdMapping as $index => $imageId) {
+                $results[$imageId] = ['tags' => [['key' => 'test', 'value' => 'batch', 'confidence' => 0.9]]];
             }
 
             return ($this->wrapWithUsage)($results);
