@@ -54,11 +54,55 @@ beforeEach(function () {
         ]);
     });
 
+    // Mock prepareImageForAi to return temp file paths
+    $this->imageServiceMock->shouldReceive('prepareImageForAi')->zeroOrMoreTimes()->andReturnUsing(function ($image) {
+        // Create a dummy temp file
+        $tempPath = tempnam(sys_get_temp_dir(), 'test_img_');
+        // Create a simple 1x1 PNG image
+        $img = imagecreatetruecolor(1, 1);
+        $color = imagecolorallocate($img, 255, 255, 255);
+        imagefill($img, 0, 0, $color);
+        ob_start();
+        imagepng($img);
+        $contents = ob_get_clean();
+        imagedestroy($img);
+        file_put_contents($tempPath, $contents);
+
+        return $tempPath;
+    });
+
     // Mock GeminiProvider for all tests
     $this->geminiMock = mock(GeminiProvider::class);
 
     // Bind the mock to the container so TagService gets the mocked instance
     $this->app->instance(GeminiProvider::class, $this->geminiMock);
+
+    // Helper to wrap tag results in new response format with usage metadata
+    $this->wrapWithUsage = function ($tagResults) {
+        return [
+            'data' => $tagResults,
+            'usage' => [
+                'model' => 'gemini-2.0-flash-exp',
+                'prompt_tokens' => 1000,
+                'completion_tokens' => 50,
+                'total_tokens' => 1050,
+                'cached_tokens' => null,
+            ],
+        ];
+    };
+
+    // Helper for batch analyze mocks with new signature (images, promptData)
+    // GeminiProvider now handles Storage facade and temp file creation internally
+    $this->mockBatchSuccess = function ($imageIds) {
+        return function ($images, $promptData) {
+            $results = [];
+            foreach ($images as $image) {
+                $results[$image->id] = ['tags' => [['key' => 'test', 'value' => 'batch', 'confidence' => 0.9]]];
+            }
+
+            return ($this->wrapWithUsage)($results);
+        };
+    };
 });
 
 test('processes exactly 10 images when there are 10 pending', function () {
@@ -74,14 +118,7 @@ test('processes exactly 10 images when there are 10 pending', function () {
     // Mock Gemini to return tags for all 10 images
     $this->geminiMock->shouldReceive('batchAnalyzeImages')
         ->once()
-        ->andReturnUsing(function ($batchImages) {
-            $results = [];
-            foreach ($batchImages as $img) {
-                $results[$img->id] = ['tags' => [['key' => 'test', 'value' => 'batch', 'confidence' => 0.9]]];
-            }
-
-            return $results;
-        });
+        ->andReturnUsing(($this->mockBatchSuccess)(null));
 
     // Execute the job
     $job = new BatchProcessImages;
@@ -108,7 +145,7 @@ test('batch job generates and attaches tags to images', function () {
     // Mock Gemini to return different tags for each image
     $this->geminiMock->shouldReceive('batchAnalyzeImages')
         ->once()
-        ->andReturn([
+        ->andReturn(($this->wrapWithUsage)([
             $images[0]->id => [
                 'tags' => [
                     ['key' => 'category', 'value' => 'pokemon card', 'confidence' => 0.95],
@@ -121,7 +158,7 @@ test('batch job generates and attaches tags to images', function () {
                     ['key' => 'title', 'value' => 'the matrix', 'confidence' => 0.90],
                 ],
             ],
-        ]);
+        ]));
 
     // Execute the job
     $job = new BatchProcessImages;
@@ -158,9 +195,9 @@ test('processes only 1 image when there is 1 pending', function () {
     // Mock Gemini to return tags for 1 image
     $this->geminiMock->shouldReceive('batchAnalyzeImages')
         ->once()
-        ->andReturn([
+        ->andReturn(($this->wrapWithUsage)([
             $image->id => ['tags' => [['key' => 'test', 'value' => 'single', 'confidence' => 0.9]]],
-        ]);
+        ]));
 
     // Execute the job
     $job = new BatchProcessImages;
@@ -184,14 +221,7 @@ test('processes exactly 10 images when there are 15 pending', function () {
     // Mock Gemini to return tags for 10 images (first batch)
     $this->geminiMock->shouldReceive('batchAnalyzeImages')
         ->once()
-        ->andReturnUsing(function ($batchImages) {
-            $results = [];
-            foreach ($batchImages as $img) {
-                $results[$img->id] = ['tags' => [['key' => 'test', 'value' => 'batch', 'confidence' => 0.9]]];
-            }
-
-            return $results;
-        });
+        ->andReturnUsing(($this->mockBatchSuccess)(null));
 
     // Execute the job
     $job = new BatchProcessImages;
@@ -235,14 +265,7 @@ test('re-dispatches when more pending images exist after processing batch', func
     // Mock Gemini
     $this->geminiMock->shouldReceive('batchAnalyzeImages')
         ->once()
-        ->andReturnUsing(function ($batchImages) {
-            $results = [];
-            foreach ($batchImages as $img) {
-                $results[$img->id] = ['tags' => [['key' => 'test', 'value' => 'batch', 'confidence' => 0.9]]];
-            }
-
-            return $results;
-        });
+        ->andReturnUsing(($this->mockBatchSuccess)(null));
 
     // Execute the job
     $job = new BatchProcessImages;
@@ -269,14 +292,7 @@ test('does not re-dispatch when no more pending images', function () {
     // Mock Gemini
     $this->geminiMock->shouldReceive('batchAnalyzeImages')
         ->once()
-        ->andReturnUsing(function ($batchImages) {
-            $results = [];
-            foreach ($batchImages as $img) {
-                $results[$img->id] = ['tags' => [['key' => 'test', 'value' => 'batch', 'confidence' => 0.9]]];
-            }
-
-            return $results;
-        });
+        ->andReturnUsing(($this->mockBatchSuccess)(null));
 
     // Execute the job
     $job = new BatchProcessImages;
@@ -301,14 +317,7 @@ test('does not re-dispatch when queue depth limit reached', function () {
     // Mock Gemini
     $this->geminiMock->shouldReceive('batchAnalyzeImages')
         ->once()
-        ->andReturnUsing(function ($batchImages) {
-            $results = [];
-            foreach ($batchImages as $img) {
-                $results[$img->id] = ['tags' => [['key' => 'test', 'value' => 'batch', 'confidence' => 0.9]]];
-            }
-
-            return $results;
-        });
+        ->andReturnUsing(($this->mockBatchSuccess)(null));
 
     // Simulate 5 jobs already in queue (MAX_QUEUED_JOBS limit)
     for ($i = 0; $i < 5; $i++) {
@@ -380,11 +389,11 @@ test('marks individual image as failed when not in batch results', function () {
     // Mock Gemini to return results for only 2 images (missing one)
     $this->geminiMock->shouldReceive('batchAnalyzeImages')
         ->once()
-        ->andReturn([
+        ->andReturn(($this->wrapWithUsage)([
             $images[0]->id => ['tags' => [['key' => 'test', 'value' => 'value1', 'confidence' => 0.9]]],
             $images[1]->id => ['tags' => [['key' => 'test', 'value' => 'value2', 'confidence' => 0.9]]],
             // images[2] is missing from results
-        ]);
+        ]));
 
     // Execute the job
     $job = new BatchProcessImages;
@@ -412,14 +421,7 @@ test('uses atomic locking to prevent race conditions', function () {
     // Mock Gemini - should only be called once
     $this->geminiMock->shouldReceive('batchAnalyzeImages')
         ->once()
-        ->andReturnUsing(function ($batchImages) {
-            $results = [];
-            foreach ($batchImages as $img) {
-                $results[$img->id] = ['tags' => [['key' => 'test', 'value' => 'batch', 'confidence' => 0.9]]];
-            }
-
-            return $results;
-        });
+        ->andReturnUsing(($this->mockBatchSuccess)(null));
 
     // Execute two jobs simultaneously (simulating race condition)
     $job1 = new BatchProcessImages;
@@ -451,14 +453,7 @@ test('assigns unique batch_id to each batch', function () {
     // Mock Gemini for 2 calls
     $this->geminiMock->shouldReceive('batchAnalyzeImages')
         ->twice()
-        ->andReturnUsing(function ($batchImages) {
-            $results = [];
-            foreach ($batchImages as $img) {
-                $results[$img->id] = ['tags' => [['key' => 'test', 'value' => 'batch', 'confidence' => 0.9]]];
-            }
-
-            return $results;
-        });
+        ->andReturnUsing(($this->mockBatchSuccess)(null));
 
     // Execute first batch
     $job1 = new BatchProcessImages;
@@ -497,11 +492,11 @@ test('ignores extra image IDs returned by gemini', function () {
     // Mock Gemini to return results for our 2 images PLUS an extra fake ID
     $this->geminiMock->shouldReceive('batchAnalyzeImages')
         ->once()
-        ->andReturn([
+        ->andReturn(($this->wrapWithUsage)([
             $images[0]->id => ['tags' => [['key' => 'test', 'value' => 'value1', 'confidence' => 0.9]]],
             $images[1]->id => ['tags' => [['key' => 'test', 'value' => 'value2', 'confidence' => 0.9]]],
             99999 => ['tags' => [['key' => 'fake', 'value' => 'extra', 'confidence' => 0.9]]], // Extra ID that doesn't exist
-        ]);
+        ]));
 
     $job = new BatchProcessImages;
     $job->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class));
@@ -533,16 +528,16 @@ test('does not pick up failed images in subsequent batches', function () {
     // Mock Gemini - should only be called with 1 image
     $this->geminiMock->shouldReceive('batchAnalyzeImages')
         ->once()
-        ->andReturnUsing(function ($batchImages) {
+        ->andReturnUsing(function ($images, $promptData) {
             // Verify only 1 image was sent
-            expect($batchImages->count())->toBe(1);
+            expect(count($images))->toBe(1);
 
             $results = [];
-            foreach ($batchImages as $img) {
-                $results[$img->id] = ['tags' => [['key' => 'test', 'value' => 'batch', 'confidence' => 0.9]]];
+            foreach ($images as $image) {
+                $results[$image->id] = ['tags' => [['key' => 'test', 'value' => 'batch', 'confidence' => 0.9]]];
             }
 
-            return $results;
+            return ($this->wrapWithUsage)($results);
         });
 
     $job = new BatchProcessImages;
@@ -574,16 +569,16 @@ test('does not pick up processing images from other active batches', function ()
     // Mock Gemini - should only be called with 1 image
     $this->geminiMock->shouldReceive('batchAnalyzeImages')
         ->once()
-        ->andReturnUsing(function ($batchImages) {
+        ->andReturnUsing(function ($images, $promptData) {
             // Verify only 1 image was sent (not the processing one)
-            expect($batchImages->count())->toBe(1);
+            expect(count($images))->toBe(1);
 
             $results = [];
-            foreach ($batchImages as $img) {
-                $results[$img->id] = ['tags' => [['key' => 'test', 'value' => 'batch', 'confidence' => 0.9]]];
+            foreach ($images as $image) {
+                $results[$image->id] = ['tags' => [['key' => 'test', 'value' => 'batch', 'confidence' => 0.9]]];
             }
 
-            return $results;
+            return ($this->wrapWithUsage)($results);
         });
 
     $job = new BatchProcessImages;
