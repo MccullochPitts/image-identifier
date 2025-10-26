@@ -63,6 +63,11 @@ class Image extends Model
             ->withTimestamps();
     }
 
+    public function embeddings(): HasMany
+    {
+        return $this->hasMany(ImageEmbedding::class);
+    }
+
     public function isOriginal(): bool
     {
         return $this->type === 'original';

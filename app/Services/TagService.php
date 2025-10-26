@@ -117,9 +117,13 @@ class TagService
             return [];
         }
 
+        // Get active embedding configurations to extract priority tag keys
+        $activeConfigs = \App\Models\EmbeddingConfiguration::where('is_active', true)->get();
+        $priorityKeys = $activeConfigs->flatMap(fn ($config) => $config->tag_keys)->unique()->values()->all();
+
         // Build a generic prompt for batch processing
         // We use the first image just to get the prompt structure
-        $promptData = $this->promptBuilder->buildPrompt($images->first(), null);
+        $promptData = $this->promptBuilder->buildPrompt($images->first(), null, $priorityKeys);
 
         // Prepare images for AI processing (creates temp files)
         $imageService = app(ImageService::class);

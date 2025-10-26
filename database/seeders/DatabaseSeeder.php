@@ -23,5 +23,8 @@ class DatabaseSeeder extends Seeder
                 'email_verified_at' => now(),
             ]
         );
+
+        // Seed the system default embedding configuration
+        $this->call(SystemDefaultEmbeddingConfigSeeder::class);
     }
 }

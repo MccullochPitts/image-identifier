@@ -15,6 +15,21 @@ jobs:
   ci:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: image_identifier_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -52,7 +67,19 @@ jobs:
       - name: Set Filesystem Disk for Tests
         run: echo "FILESYSTEM_DISK=public" >> .env
 
-      - name: Set Stripe Keys and Spark Plan IDs
+      - name: Set Database Configuration
+        run: |
+          echo "DB_CONNECTION=pgsql" >> .env
+          echo "DB_HOST=127.0.0.1" >> .env
+          echo "DB_PORT=5432" >> .env
+          echo "DB_DATABASE=image_identifier_test" >> .env
+          echo "DB_USERNAME=postgres" >> .env
+          echo "DB_PASSWORD=postgres" >> .env
+
+      - name: Run Migrations
+        run: php artisan migrate --force
+
+      - name: Set API Keys and Spark Plan IDs
         run: |
           echo "STRIPE_KEY=${{ secrets.STRIPE_KEY }}" >> .env
           echo "STRIPE_SECRET=${{ secrets.STRIPE_SECRET }}" >> .env
@@ -63,6 +90,7 @@ jobs:
           echo "SPARK_ENTERPRISE_MONTHLY_PLAN=${{ secrets.SPARK_ENTERPRISE_MONTHLY_PLAN }}" >> .env
           echo "SPARK_ENTERPRISE_YEARLY_PLAN=${{ secrets.SPARK_ENTERPRISE_YEARLY_PLAN }}" >> .env
           echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
+          echo "COHERE_API_KEY=${{ secrets.COHERE_API_KEY }}" >> .env
 
       - name: Tests
         run: ./vendor/bin/pest --exclude-group=stripe
