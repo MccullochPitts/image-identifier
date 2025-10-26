@@ -5,7 +5,6 @@ use App\Models\Image;
 use App\Models\ImageEmbedding;
 use App\Models\Tag;
 use App\Models\User;
-use App\Services\EmbeddingService;
 use App\Services\Providers\CohereProvider;
 use App\Services\SemanticSearchService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -105,10 +104,10 @@ describe('SemanticSearchService', function () {
 
     it('finds similar images by query text', function () {
         // Mock the Cohere provider
-        $mock = mock(CohereProvider::class);
+        $cohereMock = mock(CohereProvider::class);
         $mockVector = array_fill(0, 1024, 0.5); // Similar to image1's vector
 
-        $mock->shouldReceive('generateEmbeddings')
+        $cohereMock->shouldReceive('generateEmbeddings')
             ->once()
             ->with('red nike shoes', 'search_query', 'float')
             ->andReturn([
@@ -116,7 +115,8 @@ describe('SemanticSearchService', function () {
                 'usage' => ['model' => 'test', 'total_tokens' => 5],
             ]);
 
-        $embeddingService = new EmbeddingService($mock);
+        // Since we're using extractTags: false, we don't need to mock GeminiProvider
+        // But we still need to resolve the service, so let the container handle dependencies
         $searchService = app(SemanticSearchService::class);
 
         // Use raw query without tag extraction (old behavior)
