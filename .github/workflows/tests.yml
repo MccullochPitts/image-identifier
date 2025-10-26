@@ -79,7 +79,7 @@ jobs:
       - name: Run Migrations
         run: php artisan migrate --force
 
-      - name: Set Stripe Keys and Spark Plan IDs
+      - name: Set API Keys and Spark Plan IDs
         run: |
           echo "STRIPE_KEY=${{ secrets.STRIPE_KEY }}" >> .env
           echo "STRIPE_SECRET=${{ secrets.STRIPE_SECRET }}" >> .env
@@ -90,6 +90,7 @@ jobs:
           echo "SPARK_ENTERPRISE_MONTHLY_PLAN=${{ secrets.SPARK_ENTERPRISE_MONTHLY_PLAN }}" >> .env
           echo "SPARK_ENTERPRISE_YEARLY_PLAN=${{ secrets.SPARK_ENTERPRISE_YEARLY_PLAN }}" >> .env
           echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
+          echo "COHERE_API_KEY=${{ secrets.COHERE_API_KEY }}" >> .env
 
       - name: Tests
         run: ./vendor/bin/pest --exclude-group=stripe
