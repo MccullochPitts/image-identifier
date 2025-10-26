@@ -259,9 +259,6 @@ class ImageService
         return $tempPath;
     }
 
-    /**
-     * @deprecated Use copyImageToTemp() instead. This method is kept for backward compatibility.
-     */
     public function prepareImageForAi(Image $image): string
     {
         return $this->copyImageToTemp($image);

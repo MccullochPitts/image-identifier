@@ -29,7 +29,7 @@ class GeminiProvider
      */
     public function call(array $payload): array
     {
-        $model = $payload['model'] ?? 'gemini-2.0-flash-exp';
+        $model = $payload['model'] ?? 'gemini-2.5-flash-lite';
         $url = "{$this->baseUrl}/models/{$model}:generateContent?key={$this->apiKey}";
 
         try {
@@ -70,7 +70,7 @@ class GeminiProvider
 
         // Build Gemini API payload
         $payload = [
-            'model' => 'gemini-2.0-flash-exp',
+            'model' => 'gemini-2.5-flash-lite',
             'contents' => [
                 [
                     'parts' => [
@@ -113,7 +113,7 @@ class GeminiProvider
         return [
             'data' => $parsedResponse,
             'usage' => [
-                'model' => 'gemini-2.0-flash-exp',
+                'model' => 'gemini-2.5-flash-lite',
                 'prompt_tokens' => $usageMetadata['promptTokenCount'] ?? 0,
                 'completion_tokens' => $usageMetadata['candidatesTokenCount'] ?? 0,
                 'total_tokens' => $usageMetadata['totalTokenCount'] ?? 0,
@@ -168,7 +168,7 @@ class GeminiProvider
 
         // Build Gemini API payload
         $payload = [
-            'model' => 'gemini-2.0-flash-exp',
+            'model' => 'gemini-2.5-flash-lite',
             'contents' => [
                 [
                     'parts' => $parts,
@@ -218,7 +218,7 @@ class GeminiProvider
         return [
             'data' => $results,
             'usage' => [
-                'model' => 'gemini-2.0-flash-exp',
+                'model' => 'gemini-2.5-flash-lite',
                 'prompt_tokens' => $usageMetadata['promptTokenCount'] ?? 0,
                 'completion_tokens' => $usageMetadata['candidatesTokenCount'] ?? 0,
                 'total_tokens' => $usageMetadata['totalTokenCount'] ?? 0,
