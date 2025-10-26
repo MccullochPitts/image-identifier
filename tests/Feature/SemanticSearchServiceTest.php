@@ -117,13 +117,15 @@ describe('SemanticSearchService', function () {
             ]);
 
         $embeddingService = new EmbeddingService($mock);
-        $searchService = new SemanticSearchService($embeddingService);
+        $searchService = app(SemanticSearchService::class);
 
+        // Use raw query without tag extraction (old behavior)
         $results = $searchService->findSimilarByQuery(
             'red nike shoes',
             $this->config,
             limit: 5,
-            minSimilarity: 0.5
+            minSimilarity: 0.5,
+            extractTags: false
         );
 
         expect($results)->toBeInstanceOf(\Illuminate\Support\Collection::class)
