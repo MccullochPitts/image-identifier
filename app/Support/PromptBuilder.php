@@ -37,6 +37,8 @@ class PromptBuilder
 
         $systemPrompt = 'You are an expert image analyzer. Your task is to analyze images and generate descriptive key-value tags that categorize and describe the content. Return your analysis as structured key-value pairs in JSON format with confidence scores between 0 and 1.';
 
+        $systemPrompt .= "\n\nCRITICAL - CONTEXTUAL RELEVANCE:\nOnly use tags that make contextual sense for the image type you are analyzing:\n- Physical products (items, objects): Use tags like product type, brand, model, material, condition, features, color, size\n- Media (DVDs, books, games, music): Use tags like media type, format, title, genre, platform, release year, rating\n- Documents (papers, forms, receipts): Use tags like document type, page layout, text content, stamps, signatures\n- Scenes/Photos (landscapes, events, people): Use tags like scene type, setting, location type, lighting, weather, activity, mood\n- DO NOT mix incompatible contexts (e.g., do NOT use 'condition' on a landscape photo, do NOT use 'weather' on a product, do NOT use 'brand' on a nature scene)";
+
         if ($priorityKeys !== null && count($priorityKeys) > 0) {
             $systemPrompt .= "\n\nPRIORITY TAG KEYS:\n\nPlease try to provide values for these tag keys when applicable: ".implode(', ', $priorityKeys).".\n\n- Examine the image carefully and provide values for tags that are relevant to what you see\n- For media like DVDs, books, games: identify the title from visible text if present\n- For products: determine the product type, brand, or other identifying features\n- Use your knowledge and inference to fill in tags when you can identify items in the image\n- Only include a tag if it is actually relevant to the image content\n- Use lower confidence scores for inferred values\n- Skip tags that are not applicable or cannot be reasonably determined\n\nYou may also include additional relevant tags beyond these priority keys.";
         }
@@ -134,7 +136,8 @@ class PromptBuilder
         $userPrompt .= "- Medium confidence (0.6-0.8): Clearly implied (e.g., 'toy story' for title)\n";
         $userPrompt .= "- Low confidence (0.3-0.5): Vague or uncertain (e.g., 'thing' for category)\n";
         $userPrompt .= "- Omit tags that cannot be reasonably extracted from the query\n";
-        $userPrompt .= "- Normalize values to lowercase\n\n";
+        $userPrompt .= "- Normalize values to lowercase\n";
+        $userPrompt .= "- Use contextually appropriate tags (e.g., use 'media type' for movies/books, 'product type' for items, 'scene type' for photos/locations)\n\n";
 
         $userPrompt .= "EXAMPLES:\n";
         $userPrompt .= "Query: \"red nike shoes\"\n";
