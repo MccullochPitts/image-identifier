@@ -14,7 +14,9 @@ class SystemDefaultEmbeddingConfigSeeder extends Seeder
     {
         // Only create if it doesn't already exist
         if (EmbeddingConfiguration::systemDefault()->exists()) {
-            $this->command->info('System default embedding configuration already exists.');
+            if ($this->command) {
+                $this->command->info('System default embedding configuration already exists.');
+            }
 
             return;
         }
@@ -59,6 +61,8 @@ class SystemDefaultEmbeddingConfigSeeder extends Seeder
             'is_active' => true,
         ]);
 
-        $this->command->info('System default embedding configuration created successfully.');
+        if ($this->command) {
+            $this->command->info('System default embedding configuration created successfully.');
+        }
     }
 }
