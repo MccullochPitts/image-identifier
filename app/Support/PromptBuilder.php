@@ -75,6 +75,27 @@ class PromptBuilder
 
         $prompt .= "\n\nThis rule applies to EVERY situation where you identify multiple values: characters, features, colors, actors, objects, materials, locations, brands, etc.";
 
+        // Special formatting rules for specific tag types
+        $prompt .= "\n\n🚨 CRITICAL FORMATTING RULES - NEVER VIOLATE THESE:";
+
+        $prompt .= "\n\n1. QUANTITY - MUST BE PURE NUMBERS ONLY:";
+        $prompt .= "\n   Strip ALL words like 'pack', 'pieces', 'pcs', 'items', 'count'";
+        $prompt .= "\n   ✅ CORRECT: {\"key\": \"quantity\", \"value\": \"25\", \"confidence\": 0.95}";
+        $prompt .= "\n   ✅ CORRECT: {\"key\": \"quantity\", \"value\": \"1000\", \"confidence\": 0.95}";
+        $prompt .= "\n   ❌ FORBIDDEN: {\"key\": \"quantity\", \"value\": \"25 pack\", \"confidence\": 0.95} ← NO 'PACK'";
+        $prompt .= "\n   ❌ FORBIDDEN: {\"key\": \"quantity\", \"value\": \"1000 pieces\", \"confidence\": 0.95} ← NO 'PIECES'";
+        $prompt .= "\n   ❌ FORBIDDEN: {\"key\": \"quantity\", \"value\": \"100 pack\", \"confidence\": 0.95} ← NO 'PACK'";
+        $prompt .= "\n   ❌ FORBIDDEN: {\"key\": \"quantity\", \"value\": \"1000 pcs\", \"confidence\": 0.95} ← NO 'PCS'";
+
+        $prompt .= "\n\n2. SIZE - NEVER USE 'x' OR COMBINED DIMENSIONS:";
+        $prompt .= "\n   When you see dimensions like '3\" x 4\"', create separate height/width/length tags";
+        $prompt .= "\n   Analyze the image to determine which number is height vs width vs length";
+        $prompt .= "\n   ✅ CORRECT (for 3\" x 4\" item that's wider than tall):";
+        $prompt .= "\n      [{\"key\": \"height\", \"value\": \"3\\\"\", \"confidence\": 0.9},";
+        $prompt .= "\n       {\"key\": \"width\", \"value\": \"4\\\"\", \"confidence\": 0.9}]";
+        $prompt .= "\n   ❌ FORBIDDEN: {\"key\": \"size\", \"value\": \"3\\\" x 4\\\"\", \"confidence\": 0.9} ← NO 'x'";
+        $prompt .= "\n   ❌ FORBIDDEN: {\"key\": \"dimensions\", \"value\": \"3 by 4\", \"confidence\": 0.9} ← SPLIT IT";
+
         return $prompt;
     }
 
