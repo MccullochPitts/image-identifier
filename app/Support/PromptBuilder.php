@@ -66,6 +66,24 @@ class PromptBuilder
         $prompt .= "\n[{\"key\": \"character\", \"value\": \"woody and buzz\", \"confidence\": 0.95}]";
         $prompt .= "\n\nThis applies to ALL multi-value situations: multiple characters, actors, colors, objects, locations, etc. Always create separate tag entries with the same key.";
 
+        // Special formatting rules for specific tag types
+        $prompt .= "\n\n📐 SPECIAL TAG FORMATTING RULES:";
+
+        $prompt .= "\n\n1. QUANTITY tags - Values must be NUMBERS ONLY (no text):";
+        $prompt .= "\n   ✅ CORRECT: {\"key\": \"quantity\", \"value\": \"3\", \"confidence\": 0.95}";
+        $prompt .= "\n   ❌ WRONG: {\"key\": \"quantity\", \"value\": \"3 items\", \"confidence\": 0.95}";
+        $prompt .= "\n   ❌ WRONG: {\"key\": \"quantity\", \"value\": \"three\", \"confidence\": 0.95}";
+
+        $prompt .= "\n\n2. SIZE tags with multiple dimensions - SPLIT into separate dimension tags:";
+        $prompt .= "\n   Analyze the image to determine which dimension is which (height, width, length, depth, etc.)";
+        $prompt .= "\n   Items taller than wide should have height > width";
+        $prompt .= "\n   Items wider than tall should have width > height";
+        $prompt .= "\n   ✅ CORRECT (for item 10cm tall, 5cm wide):";
+        $prompt .= "\n      [{\"key\": \"height\", \"value\": \"10cm\", \"confidence\": 0.9},";
+        $prompt .= "\n       {\"key\": \"width\", \"value\": \"5cm\", \"confidence\": 0.9}]";
+        $prompt .= "\n   ❌ WRONG: {\"key\": \"size\", \"value\": \"10x5\", \"confidence\": 0.9}";
+        $prompt .= "\n   ❌ WRONG: {\"key\": \"dimensions\", \"value\": \"10cm x 5cm\", \"confidence\": 0.9}";
+
         return $prompt;
     }
 
