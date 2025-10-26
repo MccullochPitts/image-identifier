@@ -46,8 +46,8 @@ class SearchController extends Controller
             'query' => $query,
             'results' => $images->map(fn ($image) => [
                 'id' => $image->id,
-                'url' => Storage::url($image->path),
-                'thumbnail_url' => Storage::url($image->thumbnail_path),
+                'url' => Storage::disk(config('filesystems.default'))->url($image->path),
+                'thumbnail_url' => Storage::disk(config('filesystems.default'))->url($image->thumbnail_path),
                 'similarity' => round($image->getAttribute('similarity') * 100, 1),
                 'tags' => $image->tags->map(fn ($tag) => [
                     'key' => $tag->key,
