@@ -58,31 +58,43 @@ class PromptBuilder
         $prompt .= "\n\nFor each tag, provide a confidence score between 0 and 1 indicating how certain you are about the value.";
 
         // CRITICAL instruction to prevent comma-separated lists
-        $prompt .= "\n\n⚠️ CRITICAL RULE: NEVER use comma-separated lists in tag values. Each distinct item MUST be a separate tag object.";
-        $prompt .= "\n\n✅ CORRECT - If you see Woody and Buzz:";
-        $prompt .= "\n[{\"key\": \"character\", \"value\": \"woody\", \"confidence\": 0.95}, {\"key\": \"character\", \"value\": \"buzz\", \"confidence\": 0.9}]";
-        $prompt .= "\n\n❌ INCORRECT - DO NOT DO THIS:";
-        $prompt .= "\n[{\"key\": \"character\", \"value\": \"woody, buzz\", \"confidence\": 0.95}]";
-        $prompt .= "\n[{\"key\": \"character\", \"value\": \"woody and buzz\", \"confidence\": 0.95}]";
-        $prompt .= "\n\nThis applies to ALL multi-value situations: multiple characters, actors, colors, objects, locations, etc. Always create separate tag entries with the same key.";
+        $prompt .= "\n\n🚨 CRITICAL RULE - NEVER CREATE LISTS IN TAG VALUES 🚨";
+        $prompt .= "\n\nEach tag value MUST contain ONLY ONE item. NEVER use commas, semicolons, 'and', 'or', or any separators.";
+        $prompt .= "\nIf you identify multiple items for the same key, create separate tag objects.";
+
+        $prompt .= "\n\n✅ CORRECT EXAMPLES:";
+        $prompt .= "\n• Multiple characters: [{\"key\": \"character\", \"value\": \"woody\", \"confidence\": 0.95}, {\"key\": \"character\", \"value\": \"buzz\", \"confidence\": 0.9}]";
+        $prompt .= "\n• Multiple features: [{\"key\": \"feature\", \"value\": \"waterproof\", \"confidence\": 0.9}, {\"key\": \"feature\", \"value\": \"rechargeable\", \"confidence\": 0.85}]";
+        $prompt .= "\n• Multiple colors: [{\"key\": \"color\", \"value\": \"red\", \"confidence\": 1.0}, {\"key\": \"color\", \"value\": \"blue\", \"confidence\": 0.95}]";
+
+        $prompt .= "\n\n❌ WRONG - NEVER DO THIS:";
+        $prompt .= "\n• [{\"key\": \"character\", \"value\": \"woody, buzz\", \"confidence\": 0.95}] ← NO COMMAS";
+        $prompt .= "\n• [{\"key\": \"feature\", \"value\": \"waterproof, rechargeable\", \"confidence\": 0.9}] ← NO COMMAS";
+        $prompt .= "\n• [{\"key\": \"color\", \"value\": \"red and blue\", \"confidence\": 0.95}] ← NO 'AND'";
+        $prompt .= "\n• [{\"key\": \"actor\", \"value\": \"tom hanks; tim allen\", \"confidence\": 0.9}] ← NO SEMICOLONS";
+
+        $prompt .= "\n\nThis rule applies to EVERY situation where you identify multiple values: characters, features, colors, actors, objects, materials, locations, brands, etc.";
 
         // Special formatting rules for specific tag types
-        $prompt .= "\n\n📐 SPECIAL TAG FORMATTING RULES:";
+        $prompt .= "\n\n🚨 CRITICAL FORMATTING RULES - NEVER VIOLATE THESE:";
 
-        $prompt .= "\n\n1. QUANTITY tags - Values must be NUMBERS ONLY (no text):";
-        $prompt .= "\n   ✅ CORRECT: {\"key\": \"quantity\", \"value\": \"3\", \"confidence\": 0.95}";
-        $prompt .= "\n   ❌ WRONG: {\"key\": \"quantity\", \"value\": \"3 items\", \"confidence\": 0.95}";
-        $prompt .= "\n   ❌ WRONG: {\"key\": \"quantity\", \"value\": \"three\", \"confidence\": 0.95}";
+        $prompt .= "\n\n1. QUANTITY - MUST BE PURE NUMBERS ONLY:";
+        $prompt .= "\n   Strip ALL words like 'pack', 'pieces', 'pcs', 'items', 'count'";
+        $prompt .= "\n   ✅ CORRECT: {\"key\": \"quantity\", \"value\": \"25\", \"confidence\": 0.95}";
+        $prompt .= "\n   ✅ CORRECT: {\"key\": \"quantity\", \"value\": \"1000\", \"confidence\": 0.95}";
+        $prompt .= "\n   ❌ FORBIDDEN: {\"key\": \"quantity\", \"value\": \"25 pack\", \"confidence\": 0.95} ← NO 'PACK'";
+        $prompt .= "\n   ❌ FORBIDDEN: {\"key\": \"quantity\", \"value\": \"1000 pieces\", \"confidence\": 0.95} ← NO 'PIECES'";
+        $prompt .= "\n   ❌ FORBIDDEN: {\"key\": \"quantity\", \"value\": \"100 pack\", \"confidence\": 0.95} ← NO 'PACK'";
+        $prompt .= "\n   ❌ FORBIDDEN: {\"key\": \"quantity\", \"value\": \"1000 pcs\", \"confidence\": 0.95} ← NO 'PCS'";
 
-        $prompt .= "\n\n2. SIZE tags with multiple dimensions - SPLIT into separate dimension tags:";
-        $prompt .= "\n   Analyze the image to determine which dimension is which (height, width, length, depth, etc.)";
-        $prompt .= "\n   Items taller than wide should have height > width";
-        $prompt .= "\n   Items wider than tall should have width > height";
-        $prompt .= "\n   ✅ CORRECT (for item 10cm tall, 5cm wide):";
-        $prompt .= "\n      [{\"key\": \"height\", \"value\": \"10cm\", \"confidence\": 0.9},";
-        $prompt .= "\n       {\"key\": \"width\", \"value\": \"5cm\", \"confidence\": 0.9}]";
-        $prompt .= "\n   ❌ WRONG: {\"key\": \"size\", \"value\": \"10x5\", \"confidence\": 0.9}";
-        $prompt .= "\n   ❌ WRONG: {\"key\": \"dimensions\", \"value\": \"10cm x 5cm\", \"confidence\": 0.9}";
+        $prompt .= "\n\n2. SIZE - NEVER USE 'x' OR COMBINED DIMENSIONS:";
+        $prompt .= "\n   When you see dimensions like '3\" x 4\"', create separate height/width/length tags";
+        $prompt .= "\n   Analyze the image to determine which number is height vs width vs length";
+        $prompt .= "\n   ✅ CORRECT (for 3\" x 4\" item that's wider than tall):";
+        $prompt .= "\n      [{\"key\": \"height\", \"value\": \"3\\\"\", \"confidence\": 0.9},";
+        $prompt .= "\n       {\"key\": \"width\", \"value\": \"4\\\"\", \"confidence\": 0.9}]";
+        $prompt .= "\n   ❌ FORBIDDEN: {\"key\": \"size\", \"value\": \"3\\\" x 4\\\"\", \"confidence\": 0.9} ← NO 'x'";
+        $prompt .= "\n   ❌ FORBIDDEN: {\"key\": \"dimensions\", \"value\": \"3 by 4\", \"confidence\": 0.9} ← SPLIT IT";
 
         return $prompt;
     }
