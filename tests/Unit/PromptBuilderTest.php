@@ -74,4 +74,45 @@ describe('PromptBuilder', function () {
             ->and($result['schema']['properties'])->toHaveKey('tags')
             ->and($result['schema']['required'])->toContain('tags');
     });
+
+    it('builds tag extraction prompt with query and tag keys', function () {
+        $query = 'show me toy story dvds';
+        $tagKeys = ['title', 'format', 'category'];
+
+        $result = $this->builder->buildTagExtractionPrompt($query, $tagKeys);
+
+        expect($result)->toBeArray()
+            ->and($result)->toHaveKeys(['system', 'user', 'schema'])
+            ->and($result['system'])->toBeString()->not->toBeEmpty()
+            ->and($result['user'])->toBeString()->not->toBeEmpty()
+            ->and($result['schema'])->toBeArray();
+    });
+
+    it('includes query text in tag extraction prompt', function () {
+        $query = 'red nike shoes';
+        $tagKeys = ['color', 'brand', 'product type'];
+
+        $result = $this->builder->buildTagExtractionPrompt($query, $tagKeys);
+
+        expect($result['user'])->toContain($query);
+    });
+
+    it('includes all tag keys in extraction prompt', function () {
+        $tagKeys = ['color', 'brand', 'size', 'material'];
+
+        $result = $this->builder->buildTagExtractionPrompt('search query', $tagKeys);
+
+        $combinedPrompt = $result['system'].$result['user'];
+
+        foreach ($tagKeys as $key) {
+            expect($combinedPrompt)->toContain($key);
+        }
+    });
+
+    it('tag extraction prompt uses same schema as image tagging', function () {
+        $imagePromptSchema = $this->builder->buildPrompt($this->image)['schema'];
+        $extractionPromptSchema = $this->builder->buildTagExtractionPrompt('test', ['color'])['schema'];
+
+        expect($extractionPromptSchema)->toBe($imagePromptSchema);
+    });
 });

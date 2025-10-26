@@ -100,6 +100,47 @@ class TagService
     }
 
     /**
+     * Extract structured tags from a natural language search query.
+     * Used for semantic search to convert user queries into structured tags.
+     *
+     * @param  string  $query  The user's search query (e.g., "show me toy story dvds")
+     * @param  \App\Models\EmbeddingConfiguration  $config  Embedding configuration with allowed tag keys
+     * @return array<string, string> Normalized tags as key-value pairs (e.g., ['title' => 'toy story', 'format' => 'dvd'])
+     *
+     * @throws \Exception
+     */
+    public function extractTagsFromQuery(string $query, \App\Models\EmbeddingConfiguration $config): array
+    {
+        // Build the prompt using tag keys from the configuration
+        $promptData = $this->promptBuilder->buildTagExtractionPrompt($query, $config->tag_keys);
+
+        // Call Gemini with text-only prompt
+        $response = $this->geminiProvider->generateText($promptData);
+
+        // Extract tags from response
+        $extractedTags = collect($response['data']['tags'] ?? []);
+
+        // Log AI request
+        $this->logAiRequest('extract_query_tags', $response['usage'], [
+            'query' => $query,
+            'configuration_id' => $config->id,
+            'extracted_count' => $extractedTags->count(),
+        ]);
+
+        // Normalize and format tags as key-value pairs
+        $normalized = [];
+        foreach ($extractedTags as $tagData) {
+            $normalizedKey = Tag::normalizeKey($tagData['key']);
+            $normalizedValue = Tag::normalizeValue($tagData['value']);
+
+            // Store the normalized tag (last value wins if duplicate keys)
+            $normalized[$normalizedKey] = $normalizedValue;
+        }
+
+        return $normalized;
+    }
+
+    /**
      * Generate tags for multiple images in a single batch API call.
      * This is more efficient than calling generateTags() individually.
      *

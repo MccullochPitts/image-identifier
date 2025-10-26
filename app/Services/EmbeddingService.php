@@ -62,6 +62,29 @@ class EmbeddingService
     }
 
     /**
+     * Format an array of tags as text for embedding generation.
+     * Format: "key: value, key: value" (alphabetically ordered by key).
+     *
+     * @param  array<string, string>  $tags  Normalized tag key-value pairs
+     * @return string Formatted text string
+     */
+    public function formatTagsAsText(array $tags): string
+    {
+        // Build formatted pairs
+        $pairs = [];
+
+        foreach ($tags as $key => $value) {
+            $pairs[$key] = "{$key}: {$value}";
+        }
+
+        // Sort alphabetically by key for consistency
+        ksort($pairs);
+
+        // Join with comma separator
+        return implode(', ', $pairs);
+    }
+
+    /**
      * Build formatted text string from image tags according to config.
      * Format: "key: value, key: value" (alphabetically ordered by key, omit missing).
      *

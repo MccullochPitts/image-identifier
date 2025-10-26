@@ -50,6 +50,64 @@ class GeminiProvider
     }
 
     /**
+     * Call Gemini API with text-only prompt, using JSON response mode.
+     *
+     * @param  array{system: string, user: string, schema: array}  $promptData
+     * @return array{data: array, usage: array}
+     *
+     * @throws \Exception
+     */
+    public function generateText(array $promptData): array
+    {
+        // Build Gemini API payload (text-only, no image)
+        $payload = [
+            'model' => 'gemini-2.5-flash-lite',
+            'contents' => [
+                [
+                    'parts' => [
+                        [
+                            'text' => $promptData['system']."\n\n".$promptData['user'],
+                        ],
+                    ],
+                ],
+            ],
+            'generationConfig' => [
+                'response_mime_type' => 'application/json',
+                'response_schema' => $promptData['schema'],
+            ],
+        ];
+
+        $response = $this->call($payload);
+
+        // Extract the generated content
+        if (! isset($response['candidates'][0]['content']['parts'][0]['text'])) {
+            throw new \Exception('Unexpected Gemini API response format: '.json_encode($response));
+        }
+
+        $jsonText = $response['candidates'][0]['content']['parts'][0]['text'];
+
+        // Parse JSON response
+        $parsedResponse = json_decode($jsonText, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new \Exception('Failed to parse Gemini JSON response: '.json_last_error_msg());
+        }
+
+        // Extract usage metadata
+        $usageMetadata = $response['usageMetadata'] ?? [];
+
+        return [
+            'data' => $parsedResponse,
+            'usage' => [
+                'model' => 'gemini-2.5-flash-lite',
+                'prompt_tokens' => $usageMetadata['promptTokenCount'] ?? 0,
+                'completion_tokens' => $usageMetadata['candidatesTokenCount'] ?? 0,
+                'total_tokens' => $usageMetadata['totalTokenCount'] ?? 0,
+                'cached_tokens' => $usageMetadata['cachedContentTokenCount'] ?? null,
+            ],
+        ];
+    }
+
+    /**
      * Call Gemini API with an image and prompt, using JSON response mode.
      *
      * @param  array{system: string, user: string, schema: array}  $promptData
