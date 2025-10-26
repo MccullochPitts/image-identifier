@@ -16,21 +16,26 @@ class ImageResource extends JsonResource
     public function toArray(Request $request): array
     {
         // Get the configured disk
-        $disk = Storage::disk(config('filesystems.default'));
         $diskName = config('filesystems.default');
+        $disk = Storage::disk($diskName);
 
-        // Generate URLs based on disk type (signed for S3, regular for local/public)
+        // Check if disk uses S3 driver (includes Cloudflare R2)
+        // Laravel Cloud injects disks with driver 's3' but custom names like 'private'
+        $diskConfig = config("filesystems.disks.{$diskName}");
+        $usesS3Driver = isset($diskConfig['driver']) && $diskConfig['driver'] === 's3';
+
+        // Generate URLs based on disk type (signed for S3/R2, regular for local/public)
         $url = null;
         $thumbnailUrl = null;
 
         if ($this->path) {
-            $url = $diskName === 's3'
+            $url = $usesS3Driver
                 ? $disk->temporaryUrl($this->path, now()->addHour())
                 : $disk->url($this->path);
         }
 
         if ($this->thumbnail_path) {
-            $thumbnailUrl = $diskName === 's3'
+            $thumbnailUrl = $usesS3Driver
                 ? $disk->temporaryUrl($this->thumbnail_path, now()->addHour())
                 : $disk->url($this->thumbnail_path);
         }
