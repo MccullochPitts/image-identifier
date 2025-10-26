@@ -58,6 +58,9 @@ return [
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
             'throw' => false,
             'report' => false,
+            // Required for Cloudflare R2 compatibility
+            // R2 does not support ACLs (x-amz-acl headers)
+            'retain_visibility' => false,
         ],
 
     ],
