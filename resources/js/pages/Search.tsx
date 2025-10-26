@@ -34,9 +34,7 @@ export default function Search({ query: initialQuery, results }: Props) {
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
-        console.log('handleSearch called', { query });
         const searchUrl = `/search?q=${encodeURIComponent(query)}`;
-        console.log('navigating to:', searchUrl);
         router.get(searchUrl);
     };
 
