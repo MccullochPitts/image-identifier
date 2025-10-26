@@ -160,9 +160,10 @@ class GeminiProvider
                 ],
             ];
 
-            // Add label for this image
+            // Add label for this image with the actual image ID
+            $imageId = $imageIdMapping[$index];
             $parts[] = [
-                'text' => 'Image '.($index + 1),
+                'text' => "Image ID: {$imageId}",
             ];
         }
 
@@ -181,7 +182,17 @@ class GeminiProvider
                     'properties' => [
                         'results' => [
                             'type' => 'array',
-                            'items' => $promptData['schema'],
+                            'items' => [
+                                'type' => 'object',
+                                'properties' => [
+                                    'image_id' => [
+                                        'type' => 'integer',
+                                        'description' => 'The image ID from the label (e.g., "Image ID: 42" → 42)',
+                                    ],
+                                    'tags' => $promptData['schema']['properties']['tags'],
+                                ],
+                                'required' => ['image_id', 'tags'],
+                            ],
                         ],
                     ],
                     'required' => ['results'],
@@ -204,11 +215,22 @@ class GeminiProvider
             throw new \Exception('Failed to parse Gemini JSON response: '.json_last_error_msg());
         }
 
-        // Map results back to image IDs
+        // Log what Gemini returned to help diagnose failures
+        \Illuminate\Support\Facades\Log::info('Gemini batch response', [
+            'requested_images' => count($imagePaths),
+            'returned_results' => count($parsedResponse['results'] ?? []),
+            'requested_ids' => array_values($imageIdMapping),
+            'returned_ids' => array_column($parsedResponse['results'] ?? [], 'image_id'),
+        ]);
+
+        // Map results back to image IDs using the image_id field from response
         $results = [];
-        foreach ($parsedResponse['results'] as $index => $result) {
-            if (isset($imageIdMapping[$index])) {
-                $results[$imageIdMapping[$index]] = $result;
+        foreach ($parsedResponse['results'] as $result) {
+            if (isset($result['image_id']) && isset($result['tags'])) {
+                $imageId = $result['image_id'];
+                $results[$imageId] = ['tags' => $result['tags']];
+            } else {
+                \Illuminate\Support\Facades\Log::warning('Gemini returned result without image_id or tags', ['result' => $result]);
             }
         }
 

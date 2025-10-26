@@ -43,7 +43,8 @@ class BatchProcessImages implements ShouldQueue
     public function handle(
         ImageService $imageService,
         GeminiProvider $gemini,
-        TagService $tagService
+        TagService $tagService,
+        \App\Services\EmbeddingService $embeddingService
     ): void {
         $batchId = Str::uuid()->toString();
 
@@ -119,11 +120,23 @@ class BatchProcessImages implements ShouldQueue
             // Step 2: Generate tags for all images in a single batch API call to Gemini
             $batchResults = $tagService->generateTagsForBatch($images);
 
+            // Step 3: Generate embeddings ONLY for images that successfully got tags
+            // Filter to only images present in batch results to avoid minimal embeddings from user tags only
+            $successfulImages = $images->filter(fn ($img) => isset($batchResults[$img->id]));
+
+            $embeddingResults = [];
+            if ($successfulImages->isNotEmpty()) {
+                // Reload tags relationship to ensure fresh data for embedding generation
+                $successfulImages->load('tags');
+                $embeddingResults = $embeddingService->generateEmbeddingsForBatch($successfulImages);
+            }
+
             // Mark each image as completed
             foreach ($images as $image) {
                 if (isset($batchResults[$image->id])) {
+                    $embedCount = isset($embeddingResults[$image->id]) ? count($embeddingResults[$image->id]) : 0;
                     $image->update(['processing_status' => 'completed']);
-                    Log::info("BatchProcessImages: Successfully processed image {$image->id} with {$batchResults[$image->id]->count()} tags");
+                    Log::info("BatchProcessImages: Successfully processed image {$image->id} with {$batchResults[$image->id]->count()} tags and {$embedCount} embeddings");
                 } else {
                     // Image wasn't in results - mark as failed
                     $image->update([

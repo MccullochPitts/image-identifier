@@ -68,7 +68,7 @@ test('tag service generates tags from gemini response', function () {
 
     // Assert pivot data (confidence and source)
     $categoryTag = $image->tags()->where('key', 'category')->first();
-    expect($categoryTag->pivot->confidence)->toBe(0.95)
+    expect((float) $categoryTag->pivot->confidence)->toBe(0.95)
         ->and($categoryTag->pivot->source)->toBe('generated');
 });
 
@@ -113,7 +113,7 @@ test('tag service generates requested tags with correct source', function () {
 
     $colorTag = $image->tags()->where('key', 'color')->first();
     expect($colorTag->pivot->source)->toBe('requested')
-        ->and($colorTag->pivot->confidence)->toBe(0.90);
+        ->and((float) $colorTag->pivot->confidence)->toBe(0.90);
 });
 
 test('generate tags job calls tag service', function () {

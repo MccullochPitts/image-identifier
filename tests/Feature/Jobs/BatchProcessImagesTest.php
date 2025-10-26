@@ -136,7 +136,7 @@ test('processes exactly 10 images when there are 10 pending', function () {
 
     // Execute the job
     $job = new BatchProcessImages;
-    $job->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class));
+    $job->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class), app(\App\Services\EmbeddingService::class));
 
     // All 10 images should be completed
     expect(Image::where('processing_status', 'completed')->count())->toBe(10)
@@ -176,7 +176,7 @@ test('batch job generates and attaches tags to images', function () {
 
     // Execute the job
     $job = new BatchProcessImages;
-    $job->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class));
+    $job->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class), app(\App\Services\EmbeddingService::class));
 
     // First image should have its tags
     $firstImageTags = $images[0]->fresh()->tags;
@@ -186,7 +186,7 @@ test('batch job generates and attaches tags to images', function () {
 
     // Check pivot data (confidence and source)
     $categoryTag = $images[0]->fresh()->tags()->where('key', 'category')->first();
-    expect($categoryTag->pivot->confidence)->toBe(0.95)
+    expect((float) $categoryTag->pivot->confidence)->toBe(0.95)
         ->and($categoryTag->pivot->source)->toBe('generated');
 
     // Second image should have its tags
@@ -215,7 +215,7 @@ test('processes only 1 image when there is 1 pending', function () {
 
     // Execute the job
     $job = new BatchProcessImages;
-    $job->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class));
+    $job->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class), app(\App\Services\EmbeddingService::class));
 
     // Image should be completed
     expect($image->fresh()->processing_status)->toBe('completed')
@@ -239,7 +239,7 @@ test('processes exactly 10 images when there are 15 pending', function () {
 
     // Execute the job
     $job = new BatchProcessImages;
-    $job->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class));
+    $job->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class), app(\App\Services\EmbeddingService::class));
 
     // Exactly 10 should be completed, 5 still pending
     expect(Image::where('processing_status', 'completed')->count())->toBe(10)
@@ -260,7 +260,7 @@ test('does nothing when no pending images exist', function () {
 
     // Execute the job
     $job = new BatchProcessImages;
-    $job->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class));
+    $job->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class), app(\App\Services\EmbeddingService::class));
 
     // All should still be completed
     expect(Image::where('processing_status', 'completed')->count())->toBe(3);
@@ -283,7 +283,7 @@ test('re-dispatches when more pending images exist after processing batch', func
 
     // Execute the job
     $job = new BatchProcessImages;
-    $job->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class));
+    $job->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class), app(\App\Services\EmbeddingService::class));
 
     // First batch should process 10 images
     expect(Image::where('processing_status', 'completed')->count())->toBe(10)
@@ -310,7 +310,7 @@ test('does not re-dispatch when no more pending images', function () {
 
     // Execute the job
     $job = new BatchProcessImages;
-    $job->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class));
+    $job->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class), app(\App\Services\EmbeddingService::class));
 
     // All should be completed, none pending
     expect(Image::where('processing_status', 'completed')->count())->toBe(10)
@@ -347,7 +347,7 @@ test('does not re-dispatch when queue depth limit reached', function () {
 
     // Execute the job
     $job = new BatchProcessImages;
-    $job->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class));
+    $job->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class), app(\App\Services\EmbeddingService::class));
 
     // Should have processed all 10 images (batch size of 10) and NOT queued another job due to depth limit
     expect(Image::where('processing_status', 'completed')->count())->toBe(10)
@@ -374,7 +374,7 @@ test('marks all images as failed when batch processing fails entirely', function
     $job = new BatchProcessImages;
 
     try {
-        $job->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class));
+        $job->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class), app(\App\Services\EmbeddingService::class));
     } catch (\Exception $e) {
         // Expected to throw
     }
@@ -411,7 +411,7 @@ test('marks individual image as failed when not in batch results', function () {
 
     // Execute the job
     $job = new BatchProcessImages;
-    $job->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class));
+    $job->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class), app(\App\Services\EmbeddingService::class));
 
     // First 2 should be completed
     expect($images[0]->fresh()->processing_status)->toBe('completed')
@@ -442,10 +442,10 @@ test('uses atomic locking to prevent race conditions', function () {
     $job2 = new BatchProcessImages;
 
     // First job should claim all 3 images
-    $job1->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class));
+    $job1->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class), app(\App\Services\EmbeddingService::class));
 
     // Second job should find nothing to process
-    $job2->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class));
+    $job2->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class), app(\App\Services\EmbeddingService::class));
 
     // All 3 should be completed (not processed twice)
     expect(Image::where('processing_status', 'completed')->count())->toBe(3);
@@ -471,13 +471,13 @@ test('assigns unique batch_id to each batch', function () {
 
     // Execute first batch
     $job1 = new BatchProcessImages;
-    $job1->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class));
+    $job1->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class), app(\App\Services\EmbeddingService::class));
 
     $firstBatchId = Image::where('processing_status', 'completed')->first()->batch_id;
 
     // Execute second batch
     $job2 = new BatchProcessImages;
-    $job2->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class));
+    $job2->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class), app(\App\Services\EmbeddingService::class));
 
     $secondBatchId = Image::where('processing_status', 'completed')
         ->where('batch_id', '!=', $firstBatchId)
@@ -513,7 +513,7 @@ test('ignores extra image IDs returned by gemini', function () {
         ]));
 
     $job = new BatchProcessImages;
-    $job->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class));
+    $job->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class), app(\App\Services\EmbeddingService::class));
 
     // Both real images should be completed
     expect($images[0]->fresh()->processing_status)->toBe('completed')
@@ -555,7 +555,7 @@ test('does not pick up failed images in subsequent batches', function () {
         });
 
     $job = new BatchProcessImages;
-    $job->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class));
+    $job->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class), app(\App\Services\EmbeddingService::class));
 
     // Failed image should remain failed
     expect($failedImage->fresh()->processing_status)->toBe('failed');
@@ -596,7 +596,7 @@ test('does not pick up processing images from other active batches', function ()
         });
 
     $job = new BatchProcessImages;
-    $job->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class));
+    $job->handle($this->imageServiceMock, $this->geminiMock, app(TagService::class), app(\App\Services\EmbeddingService::class));
 
     // Processing image should remain in processing state
     expect($processingImage->fresh()->processing_status)->toBe('processing')
@@ -604,4 +604,142 @@ test('does not pick up processing images from other active batches', function ()
 
     // Pending image should be completed
     expect($pendingImage->fresh()->processing_status)->toBe('completed');
+});
+
+test('does not generate embeddings for images that failed tag generation', function () {
+    Queue::fake();
+
+    // Create active embedding config
+    \App\Models\EmbeddingConfiguration::create([
+        'user_id' => null,
+        'name' => 'Test Config',
+        'tag_keys' => ['test', 'category', 'brand', 'character'],
+        'scope' => 'system_default',
+        'is_default' => true,
+        'is_active' => true,
+    ]);
+
+    // Create 3 pending images
+    $images = Image::factory()->count(3)->create([
+        'user_id' => $this->user->id,
+        'processing_status' => 'pending',
+        'batch_id' => null,
+    ]);
+
+    // Mock Gemini to return results for only 2 images (skips third)
+    $this->geminiMock->shouldReceive('batchAnalyzeImages')
+        ->once()
+        ->andReturn(($this->wrapWithUsage)([
+            $images[0]->id => ['tags' => [['key' => 'test', 'value' => 'value1', 'confidence' => 0.9]]],
+            $images[1]->id => ['tags' => [['key' => 'test', 'value' => 'value2', 'confidence' => 0.9]]],
+            // images[2] is missing from results - Gemini failed to generate tags
+        ]));
+
+    // Execute the job with embedding service
+    $job = new BatchProcessImages;
+    $job->handle(
+        $this->imageServiceMock,
+        $this->geminiMock,
+        app(\App\Services\TagService::class),
+        app(\App\Services\EmbeddingService::class)
+    );
+
+    // First 2 should have embeddings
+    expect($images[0]->fresh()->embeddings()->count())->toBeGreaterThan(0)
+        ->and($images[1]->fresh()->embeddings()->count())->toBeGreaterThan(0);
+
+    // Third should NOT have embeddings (because tag generation failed)
+    expect($images[2]->fresh()->embeddings()->count())->toBe(0)
+        ->and($images[2]->fresh()->processing_status)->toBe('failed');
+});
+
+test('does not create minimal embeddings from user-provided tags only', function () {
+    Queue::fake();
+
+    // Create active embedding config
+    \App\Models\EmbeddingConfiguration::create([
+        'user_id' => null,
+        'name' => 'Test Config',
+        'tag_keys' => ['character', 'category'],
+        'scope' => 'system_default',
+        'is_default' => true,
+        'is_active' => true,
+    ]);
+
+    // Create 2 pending images - both with user-provided tags
+    $images = Image::factory()->count(2)->create([
+        'user_id' => $this->user->id,
+        'processing_status' => 'pending',
+        'batch_id' => null,
+    ]);
+
+    // Attach user-provided tags to both images
+    app(\App\Services\TagService::class)->attachProvidedTags($images[0], ['character' => 'woody']);
+    app(\App\Services\TagService::class)->attachProvidedTags($images[1], ['character' => 'buzz']);
+
+    // Mock Gemini to return tags for ONLY first image (second fails)
+    $this->geminiMock->shouldReceive('batchAnalyzeImages')
+        ->once()
+        ->andReturn(($this->wrapWithUsage)([
+            $images[0]->id => ['tags' => [
+                ['key' => 'category', 'value' => 'toy story dvd', 'confidence' => 0.95],
+                ['key' => 'brand', 'value' => 'disney', 'confidence' => 0.9],
+            ]],
+            // images[1] missing - only has user tag "character: buzz"
+        ]));
+
+    // Execute the job
+    $job = new BatchProcessImages;
+    $job->handle(
+        $this->imageServiceMock,
+        $this->geminiMock,
+        app(\App\Services\TagService::class),
+        app(\App\Services\EmbeddingService::class)
+    );
+
+    // First image: has AI tags + user tag = comprehensive embedding
+    $firstEmbedding = $images[0]->fresh()->embeddings()->first();
+    expect($firstEmbedding)->not->toBeNull()
+        ->and($firstEmbedding->source_text)->toContain('category')  // AI-generated tag
+        ->and($firstEmbedding->source_text)->toContain('character')  // User-provided tag
+        ->and(strlen($firstEmbedding->source_text))->toBeGreaterThan(30); // Comprehensive embedding (not minimal like "character: woody" = 16 chars)
+
+    // Second image: FAILED tag generation, only has user tag
+    // Should NOT have embedding (no minimal "character: buzz" embedding)
+    expect($images[1]->fresh()->embeddings()->count())->toBe(0)
+        ->and($images[1]->fresh()->processing_status)->toBe('failed');
+});
+
+test('handles gemini returning results with explicit image_id field', function () {
+    Queue::fake();
+
+    // Create 3 pending images
+    $images = Image::factory()->count(3)->create([
+        'user_id' => $this->user->id,
+        'processing_status' => 'pending',
+        'batch_id' => null,
+    ]);
+
+    // Mock Gemini with new response format that includes image_id in results
+    // This simulates the fixed GeminiProvider behavior
+    $this->geminiMock->shouldReceive('batchAnalyzeImages')
+        ->once()
+        ->andReturn(($this->wrapWithUsage)([
+            $images[0]->id => ['tags' => [['key' => 'test', 'value' => 'img1', 'confidence' => 0.9]]],
+            $images[2]->id => ['tags' => [['key' => 'test', 'value' => 'img3', 'confidence' => 0.9]]],
+            // images[1] is missing - Gemini skipped it
+        ]));
+
+    // Execute the job
+    $job = new BatchProcessImages;
+    $job->handle($this->imageServiceMock, $this->geminiMock, app(\App\Services\TagService::class), app(\App\Services\EmbeddingService::class));
+
+    // Images 0 and 2 should be completed with correct tags
+    expect($images[0]->fresh()->processing_status)->toBe('completed')
+        ->and($images[0]->fresh()->tags()->where('key', 'test')->first()->value)->toBe('img1')
+        ->and($images[2]->fresh()->processing_status)->toBe('completed')
+        ->and($images[2]->fresh()->tags()->where('key', 'test')->first()->value)->toBe('img3');
+
+    // Image 1 should be marked as failed (not in results)
+    expect($images[1]->fresh()->processing_status)->toBe('failed');
 });
