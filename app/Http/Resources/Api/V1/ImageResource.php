@@ -15,11 +15,31 @@ class ImageResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        // Get the configured disk
+        $disk = Storage::disk(config('filesystems.default'));
+        $diskName = config('filesystems.default');
+
+        // Generate URLs based on disk type (signed for S3, regular for local/public)
+        $url = null;
+        $thumbnailUrl = null;
+
+        if ($this->path) {
+            $url = $diskName === 's3'
+                ? $disk->temporaryUrl($this->path, now()->addHour())
+                : $disk->url($this->path);
+        }
+
+        if ($this->thumbnail_path) {
+            $thumbnailUrl = $diskName === 's3'
+                ? $disk->temporaryUrl($this->thumbnail_path, now()->addHour())
+                : $disk->url($this->thumbnail_path);
+        }
+
         return [
             'id' => $this->id,
             'filename' => $this->filename,
-            'url' => $this->path ? Storage::disk(config('filesystems.default'))->url($this->path) : null,
-            'thumbnail_url' => $this->thumbnail_path ? Storage::disk(config('filesystems.default'))->url($this->thumbnail_path) : null,
+            'url' => $url,
+            'thumbnail_url' => $thumbnailUrl,
             'mime_type' => $this->mime_type,
             'size' => $this->size,
             'width' => $this->width,
