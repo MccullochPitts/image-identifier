@@ -111,6 +111,51 @@ class PromptBuilder
     }
 
     /**
+     * Build a prompt for extracting tags from a text query.
+     * Used for semantic search to convert user queries into structured tags.
+     *
+     * @param  string  $query  The user's search query (e.g., "show me toy story dvds")
+     * @param  array<string>  $tagKeys  Allowed tag keys from embedding configuration
+     * @return array{system: string, user: string, schema: array}
+     */
+    public function buildTagExtractionPrompt(string $query, array $tagKeys): array
+    {
+        $systemPrompt = 'You are an expert at extracting structured information from natural language queries. Your task is to analyze a search query and extract relevant tags as key-value pairs with confidence scores.';
+
+        $userPrompt = "Extract tags from this search query: \"{$query}\"\n\n";
+        $userPrompt .= "ALLOWED TAG CATEGORIES:\n";
+        $userPrompt .= 'Only use these tag keys: '.implode(', ', $tagKeys)."\n\n";
+
+        $userPrompt .= "RULES:\n";
+        $userPrompt .= "- Only extract tags that are explicitly mentioned or clearly implied in the query\n";
+        $userPrompt .= "- Each tag must use one of the allowed tag keys listed above\n";
+        $userPrompt .= "- Confidence score represents how well the value fits the key (0-1)\n";
+        $userPrompt .= "- High confidence (0.9-1.0): Explicitly stated (e.g., 'dvd' for format)\n";
+        $userPrompt .= "- Medium confidence (0.6-0.8): Clearly implied (e.g., 'toy story' for title)\n";
+        $userPrompt .= "- Low confidence (0.3-0.5): Vague or uncertain (e.g., 'thing' for category)\n";
+        $userPrompt .= "- Omit tags that cannot be reasonably extracted from the query\n";
+        $userPrompt .= "- Normalize values to lowercase\n\n";
+
+        $userPrompt .= "EXAMPLES:\n";
+        $userPrompt .= "Query: \"red nike shoes\"\n";
+        $userPrompt .= "→ [{\"key\": \"color\", \"value\": \"red\", \"confidence\": 0.95}, {\"key\": \"brand\", \"value\": \"nike\", \"confidence\": 0.95}, {\"key\": \"product type\", \"value\": \"shoes\", \"confidence\": 0.9}]\n\n";
+
+        $userPrompt .= "Query: \"pokemon cards from the 90s\"\n";
+        $userPrompt .= "→ [{\"key\": \"category\", \"value\": \"pokemon card\", \"confidence\": 0.95}, {\"key\": \"era\", \"value\": \"90s\", \"confidence\": 0.85}]\n\n";
+
+        $userPrompt .= "Query: \"show me toy story dvds\"\n";
+        $userPrompt .= "→ [{\"key\": \"title\", \"value\": \"toy story\", \"confidence\": 0.9}, {\"key\": \"format\", \"value\": \"dvd\", \"confidence\": 0.95}]\n\n";
+
+        $userPrompt .= 'Now extract tags from the query above.';
+
+        return [
+            'system' => $systemPrompt,
+            'user' => $userPrompt,
+            'schema' => $this->buildResponseSchema(null),
+        ];
+    }
+
+    /**
      * Build JSON schema for structured response.
      *
      * @return array<string, mixed>

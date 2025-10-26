@@ -10,7 +10,10 @@ use Illuminate\Support\Facades\DB;
 
 class SemanticSearchService
 {
-    public function __construct(protected EmbeddingService $embeddingService) {}
+    public function __construct(
+        protected EmbeddingService $embeddingService,
+        protected TagService $tagService
+    ) {}
 
     /**
      * Find similar images to a source image using vector similarity.
@@ -44,10 +47,13 @@ class SemanticSearchService
 
     /**
      * Find similar images using a query text string.
-     * Generates a query embedding and searches for similar image embeddings.
+     * Extracts structured tags from the query, formats them, and generates an embedding for search.
      *
+     * @param  string  $queryText  Natural language query (e.g., "show me toy story dvds")
+     * @param  EmbeddingConfiguration  $config  Configuration with allowed tag keys
      * @param  int  $limit  Maximum number of results to return
      * @param  float  $minSimilarity  Minimum similarity threshold (0-1)
+     * @param  bool  $extractTags  Whether to extract structured tags (true) or use raw query (false)
      * @return Collection<array{image_id: int, similarity: float, distance: float}>
      *
      * @throws \Exception
@@ -56,10 +62,28 @@ class SemanticSearchService
         string $queryText,
         EmbeddingConfiguration $config,
         int $limit = 10,
-        float $minSimilarity = 0.7
+        float $minSimilarity = 0.7,
+        bool $extractTags = true
     ): Collection {
-        // Generate query embedding
-        $queryVector = $this->embeddingService->generateQueryEmbedding($queryText);
+        // Extract and format query text for embedding
+        if ($extractTags) {
+            // Extract structured tags from query using AI
+            $extractedTags = $this->tagService->extractTagsFromQuery($queryText, $config);
+
+            // If tags were extracted, format them like image embeddings
+            if (! empty($extractedTags)) {
+                $formattedText = $this->embeddingService->formatTagsAsText($extractedTags);
+            } else {
+                // Fall back to raw query if no tags extracted
+                $formattedText = $queryText;
+            }
+        } else {
+            // Use raw query text without tag extraction
+            $formattedText = $queryText;
+        }
+
+        // Generate query embedding from formatted text
+        $queryVector = $this->embeddingService->generateQueryEmbedding($formattedText);
 
         return $this->findSimilarByVector($queryVector, $config, null, $limit, $minSimilarity, 'semantic');
     }
@@ -137,8 +161,8 @@ class SemanticSearchService
         // Extract image IDs maintaining order
         $imageIds = $results->pluck('image_id');
 
-        // Load all images at once
-        $images = Image::whereIn('id', $imageIds)->get()->keyBy('id');
+        // Load all images at once with tags
+        $images = Image::with('tags')->whereIn('id', $imageIds)->get()->keyBy('id');
 
         // Return images in search result order with similarity scores
         return $results->map(function ($result) use ($images) {
