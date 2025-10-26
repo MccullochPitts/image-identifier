@@ -111,15 +111,15 @@ class SemanticSearchService
         $vectorString = '['.implode(',', $vector).']';
 
         // Calculate maximum distance for the similarity threshold
-        // Cosine similarity: 1 - (distance / 2)
-        // So distance = 2 * (1 - similarity)
-        $maxDistance = 2 * (1 - $minSimilarity);
+        // Cosine similarity: 1 - distance
+        // So distance = 1 - similarity
+        $maxDistance = 1 - $minSimilarity;
 
         // Build base query
         $query = DB::table('image_embeddings')
             ->select([
                 'image_id',
-                DB::raw("1 - (vector <=> '{$vectorString}') / 2 AS similarity"),
+                DB::raw("1 - (vector <=> '{$vectorString}') AS similarity"),
                 DB::raw("vector <=> '{$vectorString}' AS distance"),
             ])
             ->where('embedding_configuration_id', $config->id)
